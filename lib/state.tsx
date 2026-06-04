@@ -73,6 +73,7 @@ type Action =
   | { type: "HYDRATE"; payload: PersistedState }
   | { type: "TICK_DAY"; date: string }
   | { type: "COUNT" }
+  | { type: "ADD_JAAPS"; amount: number }
   | { type: "UNDO" }
   | { type: "RESET_BEAD" }
   | { type: "NEXT_MALA" }   // manual mala advance
@@ -130,6 +131,23 @@ function reducer(state: PersistedState, action: Action): PersistedState {
       return next;
     }
 
+    case "ADD_JAAPS": {
+      const amount = Math.max(0, Math.floor(action.amount));
+      if (amount === 0) return state;
+      const beadsPerMala = state.settings.beadsPerMala;
+      const total = state.currentBead + amount;
+      const malasCompleted = Math.floor(total / beadsPerMala);
+      return {
+        ...state,
+        currentBead: total % beadsPerMala,
+        todayBeads: state.todayBeads + amount,
+        lifetimeBeads: state.lifetimeBeads + amount,
+        todayMalas: state.todayMalas + malasCompleted,
+        lifetimeMalas: state.lifetimeMalas + malasCompleted,
+        lastUndoableBead: null, // bulk add isn't single-step undoable
+      };
+    }
+
     case "UNDO": {
       if (state.lastUndoableBead === null) return state;
       // Reverse the last COUNT: if the previous count completed a mala (we wrapped
@@ -179,6 +197,7 @@ type JaapContextValue = {
   state: PersistedState;
   hydrated: boolean;
   count: () => void;
+  addJaaps: (amount: number) => void;
   undo: () => void;
   resetBead: () => void;
   nextMala: () => void;
@@ -243,6 +262,7 @@ export function JaapProvider({ children }: { children: ReactNode }) {
   }
 
   const count = useCallback(() => dispatch({ type: "COUNT" }), []);
+  const addJaaps = useCallback((amount: number) => dispatch({ type: "ADD_JAAPS", amount }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const resetBead = useCallback(() => dispatch({ type: "RESET_BEAD" }), []);
   const nextMala = useCallback(() => dispatch({ type: "NEXT_MALA" }), []);
@@ -257,6 +277,7 @@ export function JaapProvider({ children }: { children: ReactNode }) {
       state,
       hydrated: hydratedRef.current,
       count,
+      addJaaps,
       undo,
       resetBead,
       nextMala,
@@ -264,7 +285,7 @@ export function JaapProvider({ children }: { children: ReactNode }) {
       updateSettings,
       malaJustCompleted: malaCompletionsRef.current,
     }),
-    [state, count, undo, resetBead, nextMala, resetAll, updateSettings]
+    [state, count, addJaaps, undo, resetBead, nextMala, resetAll, updateSettings]
   );
 
   return <JaapContext.Provider value={value}>{children}</JaapContext.Provider>;

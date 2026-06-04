@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useJaap } from "@/lib/state";
 import SettingsSheet from "./SettingsSheet";
 import HistorySheet from "./HistorySheet";
+import AddJaapsSheet from "./AddJaapsSheet";
 
 export default function TopBar() {
   const { resetBead } = useJaap();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <>
@@ -20,6 +22,9 @@ export default function TopBar() {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <IconBtn onClick={() => setAddOpen(true)} label="Add jaaps">
+            <PlusIcon />
+          </IconBtn>
           <IconBtn onClick={() => setHistoryOpen(true)} label="History">
             <CalendarIcon />
           </IconBtn>
@@ -33,6 +38,7 @@ export default function TopBar() {
       </header>
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <AddJaapsSheet open={addOpen} onClose={() => setAddOpen(false)} />
     </>
   );
 }
@@ -80,6 +86,14 @@ function GearIcon() {
         strokeWidth="1.4"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
