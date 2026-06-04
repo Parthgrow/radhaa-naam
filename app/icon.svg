@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#ffe4ec"/>
+      <stop offset="100%" stop-color="#f8c8d8"/>
+    </radialGradient>
+    <linearGradient id="petal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d6336c"/>
+      <stop offset="100%" stop-color="#c89b4d"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <g transform="translate(32 36)">
+    <g fill="url(#petal)" opacity="0.92">
+      <ellipse cx="0" cy="-12" rx="5" ry="14"/>
+      <ellipse cx="0" cy="-12" rx="5" ry="14" transform="rotate(40)"/>
+      <ellipse cx="0" cy="-12" rx="5" ry="14" transform="rotate(-40)"/>
+      <ellipse cx="0" cy="-12" rx="5" ry="14" transform="rotate(80)"/>
+      <ellipse cx="0" cy="-12" rx="5" ry="14" transform="rotate(-80)"/>
+    </g>
+    <circle r="3" fill="#c89b4d"/>
+  </g>
+</svg>
