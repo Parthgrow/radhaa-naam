@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Sheet from "./Sheet";
 import { useJaap } from "@/lib/state";
+import { todayKey, addDays } from "@/lib/date";
 
 type Props = { open: boolean; onClose: () => void };
 
@@ -12,21 +13,81 @@ export default function AddJaapsSheet({ open, onClose }: Props) {
   const { state, addJaaps } = useJaap();
   const beadsPerMala = state.settings.beadsPerMala;
   const [value, setValue] = useState("");
+  const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const amount = Math.max(0, Math.floor(Number(value) || 0));
   const total = state.currentBead + amount;
   const malasFromAdd = Math.floor(total / beadsPerMala);
+  const isToday = selectedDate === todayKey();
+  const yesterday = todayKey(addDays(new Date(), -1));
 
   function submit() {
     if (amount <= 0) return;
-    addJaaps(amount);
+    addJaaps(amount, selectedDate);
     setValue("");
+    setSelectedDate(todayKey());
+    setShowDatePicker(false);
     onClose();
   }
 
   return (
     <Sheet open={open} onClose={onClose} title="Add jaaps">
       <div className="space-y-5">
+        <div>
+          <span className="text-xs text-muted block mb-2">For which date?</span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDate(todayKey());
+                setShowDatePicker(false);
+              }}
+              className={`rounded-full px-3 py-1.5 text-sm transition ${
+                isToday
+                  ? "bg-primary text-white"
+                  : "bg-ring/40 hover:bg-ring/60 text-foreground"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDate(yesterday);
+                setShowDatePicker(false);
+              }}
+              className={`rounded-full px-3 py-1.5 text-sm transition ${
+                selectedDate === yesterday && !showDatePicker
+                  ? "bg-primary text-white"
+                  : "bg-ring/40 hover:bg-ring/60 text-foreground"
+              }`}
+            >
+              Yesterday
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className={`rounded-full px-3 py-1.5 text-sm transition ${
+                showDatePicker
+                  ? "bg-primary text-white"
+                  : "bg-ring/40 hover:bg-ring/60 text-foreground"
+              }`}
+            >
+              Pick date
+            </button>
+          </div>
+          {showDatePicker && (
+            <input
+              type="date"
+              max={todayKey()}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="mt-2 w-full rounded-lg bg-surface ring-1 ring-ring/40 px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          )}
+        </div>
+
         <label className="block">
           <span className="text-xs text-muted">Number of jaaps (naam) to add</span>
           <input
@@ -60,6 +121,15 @@ export default function AddJaapsSheet({ open, onClose }: Props) {
         <div className="rounded-xl bg-surface ring-1 ring-ring/40 px-4 py-3 text-sm text-muted">
           {amount > 0 ? (
             <>
+              {!isToday && (
+                <div className="mb-2 text-[12px] text-primary">
+                  Adding to {new Date(selectedDate).toLocaleDateString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </div>
+              )}
               Adds <span className="text-foreground font-medium tabular-nums">{amount.toLocaleString()}</span> naam
               {malasFromAdd > 0 && (
                 <>

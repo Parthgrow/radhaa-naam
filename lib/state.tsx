@@ -73,7 +73,7 @@ type Action =
   | { type: "HYDRATE"; payload: PersistedState }
   | { type: "TICK_DAY"; date: string }
   | { type: "COUNT" }
-  | { type: "ADD_JAAPS"; amount: number }
+  | { type: "ADD_JAAPS"; amount: number; date?: string }
   | { type: "UNDO" }
   | { type: "RESET_BEAD" }
   | { type: "NEXT_MALA" }   // manual mala advance
@@ -135,6 +135,28 @@ function reducer(state: PersistedState, action: Action): PersistedState {
       const amount = Math.max(0, Math.floor(action.amount));
       if (amount === 0) return state;
       const beadsPerMala = state.settings.beadsPerMala;
+      const targetDate = action.date ?? state.todayDate;
+
+      // Past-date path: write to history, don't touch currentBead
+      if (targetDate !== state.todayDate) {
+        const existing = state.history[targetDate];
+        const prevBeads = existing?.beads ?? 0;
+        const prevMalas = existing?.malas ?? 0;
+        const newBeads = prevBeads + amount;
+        const newMalas = Math.floor(newBeads / beadsPerMala);
+        return {
+          ...state,
+          history: {
+            ...state.history,
+            [targetDate]: { date: targetDate, beads: newBeads, malas: newMalas },
+          },
+          lifetimeBeads: state.lifetimeBeads + amount,
+          lifetimeMalas: state.lifetimeMalas + (newMalas - prevMalas),
+          lastUndoableBead: null,
+        };
+      }
+
+      // Today path: unchanged
       const total = state.currentBead + amount;
       const malasCompleted = Math.floor(total / beadsPerMala);
       return {
@@ -197,7 +219,7 @@ type JaapContextValue = {
   state: PersistedState;
   hydrated: boolean;
   count: () => void;
-  addJaaps: (amount: number) => void;
+  addJaaps: (amount: number, date?: string) => void;
   undo: () => void;
   resetBead: () => void;
   nextMala: () => void;
@@ -262,7 +284,7 @@ export function JaapProvider({ children }: { children: ReactNode }) {
   }
 
   const count = useCallback(() => dispatch({ type: "COUNT" }), []);
-  const addJaaps = useCallback((amount: number) => dispatch({ type: "ADD_JAAPS", amount }), []);
+  const addJaaps = useCallback((amount: number, date?: string) => dispatch({ type: "ADD_JAAPS", amount, date }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const resetBead = useCallback(() => dispatch({ type: "RESET_BEAD" }), []);
   const nextMala = useCallback(() => dispatch({ type: "NEXT_MALA" }), []);
