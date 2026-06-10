@@ -1,4 +1,9 @@
-import NextAuth from "next-auth";
+import { getServerSession } from "next-auth/next";
+import { signOut as nextAuthSignOut } from "next-auth/react";
 import { authOptions } from "@/lib/auth-config";
 
-export const { auth, signIn, signOut } = NextAuth(authOptions);
+export async function auth() {
+  return await getServerSession(authOptions);
+}
+
+export { nextAuthSignOut as signOut };

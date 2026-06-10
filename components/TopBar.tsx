@@ -1,20 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useJaap } from "@/lib/state";
 import SettingsSheet from "./SettingsSheet";
 import HistorySheet from "./HistorySheet";
 import AddJaapsSheet from "./AddJaapsSheet";
+import UserProfile from "./UserProfile";
 
 export default function TopBar() {
   const { resetBead } = useJaap();
+  const { data: session } = useSession();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
   return (
     <>
-      <header className="w-full max-w-md mx-auto px-5 pt-5 pb-2 flex items-center justify-between">
+      <header className="w-full px-5 pt-5 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <LotusIcon />
           <span className="text-sm font-semibold tracking-wide text-foreground">
@@ -34,6 +37,7 @@ export default function TopBar() {
           <IconBtn onClick={() => setSettingsOpen(true)} label="Settings">
             <GearIcon />
           </IconBtn>
+          {session && <UserProfile email={session.user?.email} name={session.user?.name} />}
         </div>
       </header>
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
