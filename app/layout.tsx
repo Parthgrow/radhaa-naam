@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Tiro_Devanagari_Hindi } from "next/font/google";
 import "./globals.css";
-import { JaapProvider } from "@/lib/state";
 import PWARegister from "@/components/PWARegister";
+import { Providers } from "./providers";
 
 const sans = Inter({
   variable: "--font-sans-stack",
@@ -52,7 +52,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <JaapProvider>{children}</JaapProvider>
+        <Providers>{children}</Providers>
         <PWARegister />
       </body>
     </html>
