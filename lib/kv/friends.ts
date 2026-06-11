@@ -34,7 +34,7 @@ export async function sendFriendRequest(
     const existing = await kv.sismember(getFriendsKey(fromUserId), toUserId);
     if (existing) return null;
 
-    const outgoing = await kv.smembers<string>(getPendingOutgoingKey(fromUserId));
+    const outgoing = await kv.smembers<string[]>(getPendingOutgoingKey(fromUserId));
     for (const reqId of outgoing) {
       const req = await kv.get<string>(getFriendRequestKey(reqId));
       if (req) {
@@ -116,7 +116,7 @@ export async function declineFriendRequest(
 
 export async function getFriends(userId: string): Promise<User[]> {
   try {
-    const friendIds = await kv.smembers<string>(getFriendsKey(userId));
+    const friendIds = await kv.smembers<string[]>(getFriendsKey(userId));
     const friends: User[] = [];
 
     for (const friendId of friendIds) {
@@ -135,7 +135,7 @@ export async function getPendingRequests(
   userId: string
 ): Promise<Array<{ request: FriendRequest; from: User }>> {
   try {
-    const requestIds = await kv.smembers<string>(getPendingIncomingKey(userId));
+    const requestIds = await kv.smembers<string[]>(getPendingIncomingKey(userId));
     const pending: Array<{ request: FriendRequest; from: User }> = [];
 
     for (const reqId of requestIds) {
@@ -161,12 +161,12 @@ export async function getRandomRecommendations(
   count: number = 4
 ): Promise<User[]> {
   try {
-    const allUserIds = await kv.smembers<string>(`${PROJECT_PREFIX}:users:all`);
-    const friendIds = await kv.smembers<string>(getFriendsKey(userId));
+    const allUserIds = await kv.smembers<string[]>(`${PROJECT_PREFIX}:users:all`);
+    const friendIds = await kv.smembers<string[]>(getFriendsKey(userId));
     const friendSet = new Set(friendIds);
 
-    const outgoing = await kv.smembers<string>(getPendingOutgoingKey(userId));
-    const incoming = await kv.smembers<string>(getPendingIncomingKey(userId));
+    const outgoing = await kv.smembers<string[]>(getPendingOutgoingKey(userId));
+    const incoming = await kv.smembers<string[]>(getPendingIncomingKey(userId));
     const pendingRequestIds = new Set([...outgoing, ...incoming]);
 
     const pendingUserIds = new Set<string>();
