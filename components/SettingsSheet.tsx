@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import Sheet from "./Sheet";
 import { useJaap, DEFAULT_SETTINGS, type Theme } from "@/lib/state";
 
@@ -16,8 +17,13 @@ const NAAM_PRESETS: Array<{ naam: string; transliteration: string }> = [
 
 export default function SettingsSheet({ open, onClose }: Props) {
   const { state, updateSettings, resetAll } = useJaap();
+  const { data: session } = useSession();
   const s = state.settings;
   const [confirmReset, setConfirmReset] = useState(false);
+  const [username, setUsername] = useState("");
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const [allowRecommendations, setAllowRecommendations] = useState(true);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
 
   return (
     <Sheet open={open} onClose={onClose} title="Settings">
@@ -138,6 +144,71 @@ export default function SettingsSheet({ open, onClose }: Props) {
             ))}
           </div>
         </Section>
+
+        {session?.user?.id && (
+          <>
+            <Section title="Profile">
+              <Field label="Username">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Choose username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="flex-1 rounded-lg bg-surface ring-1 ring-ring/40 px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <button
+                    type="button"
+                    disabled={usernameLoading || !username}
+                    onClick={async () => {
+                      setUsernameLoading(true);
+                      try {
+                        const r = await fetch("/api/user/profile", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ username }),
+                        });
+                        if (r.ok) {
+                          setUsername("");
+                        }
+                      } catch (e) {
+                        console.error(e);
+                      } finally {
+                        setUsernameLoading(false);
+                      }
+                    }}
+                    className="rounded-lg bg-primary px-3 py-2 text-white disabled:bg-muted"
+                  >
+                    {usernameLoading ? "..." : "Set"}
+                  </button>
+                </div>
+              </Field>
+            </Section>
+
+            <Section title="Privacy">
+              <Toggle
+                label="Appear in recommendations"
+                on={allowRecommendations}
+                onChange={async (v) => {
+                  setRecommendationsLoading(true);
+                  setAllowRecommendations(v);
+                  try {
+                    await fetch("/api/user/profile", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ allowRecommendations: v }),
+                    });
+                  } catch (e) {
+                    console.error(e);
+                    setAllowRecommendations(!v);
+                  } finally {
+                    setRecommendationsLoading(false);
+                  }
+                }}
+              />
+            </Section>
+          </>
+        )}
 
         <Section title="Reset">
           {!confirmReset ? (

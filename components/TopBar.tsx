@@ -6,6 +6,7 @@ import { useJaap } from "@/lib/state";
 import SettingsSheet from "./SettingsSheet";
 import HistorySheet from "./HistorySheet";
 import AddJaapsSheet from "./AddJaapsSheet";
+import FriendsSheet from "./FriendsSheet";
 import UserProfile from "./UserProfile";
 
 export default function TopBar() {
@@ -14,6 +15,7 @@ export default function TopBar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
 
   return (
     <>
@@ -31,6 +33,11 @@ export default function TopBar() {
           <IconBtn onClick={() => setHistoryOpen(true)} label="History">
             <CalendarIcon />
           </IconBtn>
+          {session && (
+            <IconBtn onClick={() => setFriendsOpen(true)} label="Saangh">
+              <PeopleIcon />
+            </IconBtn>
+          )}
           <IconBtn onClick={resetBead} label="Reset current bead">
             <RefreshIcon />
           </IconBtn>
@@ -43,6 +50,7 @@ export default function TopBar() {
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
       <AddJaapsSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <FriendsSheet open={friendsOpen} onClose={() => setFriendsOpen(false)} />
     </>
   );
 }
@@ -123,6 +131,21 @@ function RefreshIcon() {
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PeopleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="9" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="15" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M5 21c0-3.87 1.5-4 4-4h2c2.5 0 4 .13 4 4M11 21c0-3.87 1.5-4 4-4h2c2.5 0 4 .13 4 4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
       />
     </svg>
   );
