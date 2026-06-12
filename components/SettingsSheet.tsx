@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import Sheet from "./Sheet";
-import { useJaap, DEFAULT_SETTINGS, type Theme } from "@/lib/state";
+import { useJaapCount, DEFAULT_SETTINGS } from "@/lib/useJaapCount";
+import type { JaapSettings } from "@/lib/useJaapCount";
 
 type Props = { open: boolean; onClose: () => void };
 
@@ -16,9 +17,8 @@ const NAAM_PRESETS: Array<{ naam: string; transliteration: string }> = [
 ];
 
 export default function SettingsSheet({ open, onClose }: Props) {
-  const { state, updateSettings, resetAll } = useJaap();
+  const { settings: s, updateSettings, resetAll } = useJaapCount();
   const { data: session } = useSession();
-  const s = state.settings;
   const [confirmReset, setConfirmReset] = useState(false);
   const [username, setUsername] = useState("");
   const [usernameLoading, setUsernameLoading] = useState(false);

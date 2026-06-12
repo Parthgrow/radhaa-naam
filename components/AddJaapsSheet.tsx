@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Sheet from "./Sheet";
-import { useJaap } from "@/lib/state";
+import { useJaapCount } from "@/lib/useJaapCount";
 import { todayKey, addDays } from "@/lib/date";
 
 type Props = { open: boolean; onClose: () => void };
@@ -10,8 +10,8 @@ type Props = { open: boolean; onClose: () => void };
 const QUICK = [27, 54, 108, 216, 1080];
 
 export default function AddJaapsSheet({ open, onClose }: Props) {
-  const { state, addJaaps } = useJaap();
-  const beadsPerMala = state.settings.beadsPerMala;
+  const { data: state, addJaaps, settings } = useJaapCount();
+  const beadsPerMala = settings.beadsPerMala;
   const [value, setValue] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [showDatePicker, setShowDatePicker] = useState(false);

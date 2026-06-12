@@ -2,15 +2,21 @@
 
 import Sheet from "./Sheet";
 import HeatmapCalendar from "./HeatmapCalendar";
-import { useJaap, selectDailyHistoryMap, selectGoalNaam } from "@/lib/state";
+import { useJaapCount } from "@/lib/useJaapCount";
 import { currentStreak, longestStreak, parseKey } from "@/lib/date";
 
 type Props = { open: boolean; onClose: () => void };
 
 export default function HistorySheet({ open, onClose }: Props) {
-  const { state } = useJaap();
-  const byDate = selectDailyHistoryMap(state);
-  const goal = selectGoalNaam(state);
+  const { data: state, settings } = useJaapCount();
+  const byDate: Record<string, number> = {};
+  Object.entries(state.history).forEach(([date, record]) => {
+    byDate[date] = record.beads;
+  });
+  if (state.todayBeads > 0 && state.todayDate) {
+    byDate[state.todayDate] = state.todayBeads;
+  }
+  const goal = settings.malaGoal * settings.beadsPerMala;
   const streak = currentStreak(byDate);
   const longest = longestStreak(byDate);
   const totalDays = Object.values(byDate).filter((v) => v > 0).length;

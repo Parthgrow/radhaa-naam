@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useJaap } from "@/lib/state";
+import { useJaapCount } from "@/lib/useJaapCount";
 import SettingsSheet from "./SettingsSheet";
 import HistorySheet from "./HistorySheet";
 import AddJaapsSheet from "./AddJaapsSheet";
@@ -10,7 +10,7 @@ import FriendsSheet from "./FriendsSheet";
 import UserProfile from "./UserProfile";
 
 export default function TopBar() {
-  const { resetBead } = useJaap();
+  const { resetBead } = useJaapCount();
   const { data: session } = useSession();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);

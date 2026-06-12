@@ -1,13 +1,19 @@
 "use client";
 
-import { useJaap, selectDailyHistoryMap, selectGoalNaam } from "@/lib/state";
+import { useJaapCount } from "@/lib/useJaapCount";
 import { currentStreak, lastNDays, parseKey } from "@/lib/date";
 
 export default function SevenDayStrip() {
-  const { state } = useJaap();
-  const byDate = selectDailyHistoryMap(state);
+  const { data, settings } = useJaapCount();
+  const byDate: Record<string, number> = {};
+  Object.entries(data.history).forEach(([date, record]) => {
+    byDate[date] = record.beads;
+  });
+  if (data.todayBeads > 0) {
+    byDate[data.todayDate ?? ''] = data.todayBeads;
+  }
   const days = lastNDays(7);
-  const goal = selectGoalNaam(state) || 1;
+  const goal = settings.malaGoal * settings.beadsPerMala || 1;
   const streak = currentStreak(byDate);
 
   const max = Math.max(goal, ...days.map((d) => byDate[d] ?? 0));
@@ -19,7 +25,7 @@ export default function SevenDayStrip() {
           const beads = byDate[d] ?? 0;
           const pct = max > 0 ? beads / max : 0;
           const goalMet = beads >= goal;
-          const isToday = d === state.todayDate;
+          const isToday = d === data.todayDate;
           return (
             <div key={d} className="flex flex-1 flex-col items-center gap-1">
               <div className="relative h-12 w-full rounded-md bg-ring/30 overflow-hidden">

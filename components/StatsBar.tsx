@@ -1,29 +1,28 @@
 "use client";
 
-import { useJaap, selectGoalNaam } from "@/lib/state";
+import { useJaapCount } from "@/lib/useJaapCount";
 
 function fmt(n: number): string {
   return n.toLocaleString();
 }
 
 export default function StatsBar() {
-  const { state } = useJaap();
-  const goalNaam = selectGoalNaam(state);
-  const goalMalas = state.settings.malaGoal;
-  const pct = goalNaam > 0 ? Math.min(1, state.todayBeads / goalNaam) : 0;
+  const { data, settings } = useJaapCount();
+  const goalNaam = settings.malaGoal * settings.beadsPerMala;
+  const pct = goalNaam > 0 ? Math.min(1, data.todayBeads / goalNaam) : 0;
 
   return (
     <div className="w-full max-w-md mx-auto px-6 pb-2">
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <StatCard label="Today (naam)" value={fmt(state.todayBeads)} sub={`${state.todayMalas} malas`} />
-        <StatCard label="Lifetime" value={fmt(state.lifetimeBeads)} sub={`${fmt(state.lifetimeMalas)} malas`} />
+        <StatCard label="Today (naam)" value={fmt(data.todayBeads)} sub={`${data.todayMalas} malas`} />
+        <StatCard label="Lifetime" value={fmt(data.lifetimeBeads)} sub={`${fmt(data.lifetimeMalas)} malas`} />
       </div>
 
       <div className="rounded-2xl bg-surface backdrop-blur-sm px-4 py-3 shadow-[var(--shadow)] ring-1 ring-ring/30">
         <div className="flex items-baseline justify-between text-xs text-muted">
           <span>Daily goal</span>
           <span>
-            {fmt(state.todayBeads)} / {fmt(goalNaam)} naam · {state.todayMalas} / {goalMalas} malas
+            {fmt(data.todayBeads)} / {fmt(goalNaam)} naam · {data.todayMalas} / {settings.malaGoal} malas
           </span>
         </div>
         <div className="mt-2 h-2 w-full rounded-full bg-ring/40 overflow-hidden">

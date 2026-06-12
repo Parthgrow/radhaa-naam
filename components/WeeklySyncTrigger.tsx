@@ -2,15 +2,15 @@
 
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useJaap } from "@/lib/state";
+import { useJaapCount } from "@/lib/useJaapCount";
 import { getWeekStart } from "@/lib/kv/week";
 
 export default function WeeklySyncTrigger() {
-  const { state, hydrated } = useJaap();
+  const { data: state } = useJaapCount();
   const { data: session } = useSession();
 
   useEffect(() => {
-    if (!hydrated || !session?.user?.id) return;
+    if (!session?.user?.id) return;
 
     const weekStart = getWeekStart();
     const totalBeads = computeWeekBeads(state, weekStart);
@@ -29,7 +29,7 @@ export default function WeeklySyncTrigger() {
       .catch((error) => {
         console.error("Weekly sync error:", error);
       });
-  }, [hydrated, session?.user?.id, state]);
+  }, [session?.user?.id, state]);
 
   return null;
 }

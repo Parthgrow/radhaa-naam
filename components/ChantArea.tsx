@@ -1,34 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useJaap } from "@/lib/state";
+import { useJaapCount } from "@/lib/useJaapCount";
 import { playBell, vibrate } from "@/lib/sounds";
 import BeadRing from "./BeadRing";
 
 export default function ChantArea() {
-  const { state, count, undo, malaJustCompleted } = useJaap();
+  const { data, settings, count, undo } = useJaapCount();
   const [pulseKey, setPulseKey] = useState(0);
   const [burstKey, setBurstKey] = useState<number | undefined>(undefined);
   const [showFloat, setShowFloat] = useState<{ id: number } | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
-  const lastMalaSeen = useRef(malaJustCompleted);
+  const lastMalaSeen = useRef(data.todayMalas);
 
   // Trigger burst + bell when a mala completes
   useEffect(() => {
-    if (malaJustCompleted !== lastMalaSeen.current && malaJustCompleted > 0) {
-      lastMalaSeen.current = malaJustCompleted;
-      setBurstKey(malaJustCompleted);
-      playBell(state.settings.sound);
-      vibrate(state.settings.haptics, [20, 60, 40]);
+    if (data.todayMalas !== lastMalaSeen.current && data.todayMalas > 0) {
+      lastMalaSeen.current = data.todayMalas;
+      setBurstKey(data.todayMalas);
+      playBell(settings.sound);
+      vibrate(settings.haptics, [20, 60, 40]);
     }
-  }, [malaJustCompleted, state.settings.sound, state.settings.haptics]);
+  }, [data.todayMalas, settings.sound, settings.haptics]);
 
   function handleCount() {
     count();
     setPulseKey((k) => k + 1);
     setShowFloat({ id: Date.now() });
-    vibrate(state.settings.haptics, 10);
+    vibrate(settings.haptics, 10);
   }
 
   function onPointerDown() {
@@ -77,7 +77,7 @@ export default function ChantArea() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.settings.haptics]);
+  }, [settings.haptics]);
 
   return (
     <button
@@ -96,17 +96,17 @@ export default function ChantArea() {
           ॥ jaap ॥
         </div>
         <div className="font-deva text-5xl sm:text-6xl text-primary leading-none drop-shadow-sm">
-          {state.settings.naam}
+          {settings.naam}
         </div>
         <div className="text-base text-muted tracking-wide">
-          {state.settings.transliteration}
+          {settings.transliteration}
         </div>
       </div>
 
       <div className="relative">
         <BeadRing
-          current={state.currentBead}
-          total={state.settings.beadsPerMala}
+          current={data.currentBead}
+          total={settings.beadsPerMala}
           pulseKey={pulseKey}
           burstKey={burstKey}
         />
@@ -115,7 +115,7 @@ export default function ChantArea() {
             key={showFloat.id}
             className="font-deva pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 text-2xl text-primary animate-float"
           >
-            {state.settings.naam}
+            {settings.naam}
           </span>
         )}
       </div>
