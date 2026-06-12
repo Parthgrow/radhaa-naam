@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import Sheet from "./Sheet";
 import { useJaapCount, DEFAULT_SETTINGS } from "@/lib/useJaapCount";
-import type { JaapSettings } from "@/lib/useJaapCount";
+import type { Theme } from "@/lib/useJaapCount";
 
 type Props = { open: boolean; onClose: () => void };
 

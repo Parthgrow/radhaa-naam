@@ -31,10 +31,11 @@ export default function HistorySheet({ open, onClose }: Props) {
     URL.revokeObjectURL(url);
   }
 
-  const recent = Object.values(state.history)
+  const recent = Object.entries(state.history)
+    .map(([date, record]) => ({ date, ...record }))
     .concat(
       state.todayBeads > 0
-        ? [{ date: state.todayDate, beads: state.todayBeads, malas: state.todayMalas }]
+        ? [{ date: state.todayDate ?? '', beads: state.todayBeads, malas: state.todayMalas }]
         : []
     )
     .sort((a, b) => (a.date < b.date ? 1 : -1))

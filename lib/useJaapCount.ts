@@ -5,6 +5,8 @@ import { todayKey, lastNDays } from "./date";
 const BEADS_PER_MALA = 108;
 const DEFAULT_MALA_GOAL = 5;
 
+export type Theme = "lotus" | "dark" | "auto";
+
 export interface JaapData {
   todayBeads: number;
   todayMalas: number;
@@ -22,7 +24,7 @@ export interface JaapSettings {
   malaGoal: number;
   haptics: boolean;
   sound: boolean;
-  theme: "lotus" | "dark" | "auto";
+  theme: Theme;
 }
 
 export const DEFAULT_SETTINGS: JaapSettings = {
