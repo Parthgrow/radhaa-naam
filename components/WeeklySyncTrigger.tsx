@@ -13,10 +13,6 @@ export default function WeeklySyncTrigger() {
     if (!hydrated || !session?.user?.id) return;
 
     const weekStart = getWeekStart();
-    const syncKey = `radha-sync:${weekStart}`;
-    const alreadySynced = localStorage.getItem(syncKey);
-    if (alreadySynced) return;
-
     const totalBeads = computeWeekBeads(state, weekStart);
     const totalMalas = computeWeekMalas(state, weekStart);
 
@@ -26,11 +22,13 @@ export default function WeeklySyncTrigger() {
       body: JSON.stringify({ totalBeads, totalMalas }),
     })
       .then((r) => {
-        if (r.ok) {
-          localStorage.setItem(syncKey, "1");
+        if (!r.ok) {
+          console.warn("Weekly sync failed");
         }
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.error("Weekly sync error:", error);
+      });
   }, [hydrated, session?.user?.id, state]);
 
   return null;

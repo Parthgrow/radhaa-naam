@@ -35,3 +35,23 @@ export interface JWTPayload {
   iat?: number;
   exp?: number;
 }
+
+export interface DailyJaap {
+  userId: string;
+  date: string;          // YYYY-MM-DD
+  beads: number;
+  malas: number;
+  lastSyncedAt: string;  // ISO timestamp for conflict resolution
+}
+
+export interface UserSettings {
+  userId: string;
+  naam: string;
+  transliteration: string;
+  beadsPerMala: number;
+  malaGoal: number;
+  haptics: boolean;
+  sound: boolean;
+  theme: "lotus" | "dark" | "auto";
+  updatedAt: string;
+}

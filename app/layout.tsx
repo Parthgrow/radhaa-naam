@@ -44,10 +44,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Apply theme before paint to avoid flash */}
+        {/* Theme will be applied by React after hydration from database */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=JSON.parse(localStorage.getItem('radha-naam-jaap')||'null');var t=(s&&s.settings&&s.settings.theme)||'lotus';var d=document.documentElement;if(t==='dark'){d.classList.add('theme-dark');}else if(t==='auto'){if(matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('theme-dark');}}catch(e){}})();`,
+            __html: `(function(){var t='lotus';var d=document.documentElement;if(t==='dark'){d.classList.add('theme-dark');}else if(t==='auto'){if(matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('theme-dark');}})();`,
           }}
         />
       </head>

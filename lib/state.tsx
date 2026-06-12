@@ -10,8 +10,9 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useSession } from "next-auth/react";
 import { todayKey } from "./date";
-import { loadState, saveState } from "./storage";
+import { syncToServer, registerSyncOnLeave } from "./sync";
 
 export type Theme = "lotus" | "dark" | "auto";
 
@@ -232,27 +233,61 @@ const JaapContext = createContext<JaapContextValue | null>(null);
 
 export function JaapProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, freshState);
+  const { data: session } = useSession();
   const hydratedRef = useRef(false);
   const malaCompletionsRef = useRef(0);
   const prevLifetimeMalasRef = useRef(state.lifetimeMalas);
 
-  // Hydrate from localStorage once on mount
+  // Hydrate from database once on mount
   useEffect(() => {
-    const loaded = loadState();
-    if (loaded) {
-      dispatch({ type: "HYDRATE", payload: { ...freshState(), ...loaded, settings: { ...DEFAULT_SETTINGS, ...loaded.settings } } });
-    }
     hydratedRef.current = true;
-    // Apply theme class once hydrated (avoid SSR mismatch)
-    applyThemeClass(loaded?.settings?.theme ?? DEFAULT_SETTINGS.theme);
+    // Apply theme class with default
+    applyThemeClass(DEFAULT_SETTINGS.theme);
+    // Register sync handlers
+    registerSyncOnLeave();
   }, []);
 
-  // Debounced save (~120ms)
+  // Fetch data from database on login
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    const id = window.setTimeout(() => saveState(state), 120);
-    return () => window.clearTimeout(id);
-  }, [state]);
+    if (!session?.user?.id || !hydratedRef.current) return;
+
+    const today = todayKey();
+    fetch(`/api/jaap/save-daily?date=${today}`)
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.success && result.data) {
+          // Got data from database, hydrate with it
+          const dbData = result.data;
+          const todayBeads = dbData.beads ?? 0;
+          // Calculate currentBead from todayBeads
+          const currentBead = todayBeads % DEFAULT_SETTINGS.beadsPerMala;
+
+          dispatch({
+            type: "HYDRATE",
+            payload: {
+              ...freshState(),
+              todayDate: today,
+              todayBeads,
+              todayMalas: dbData.malas ?? 0,
+              currentBead,
+              settings: DEFAULT_SETTINGS,
+            },
+          });
+        }
+        // If no data in DB, use fresh state (which we start with)
+      })
+      .catch((error) => {
+        console.error("Failed to fetch today's data from database:", error);
+        // On error, continue with fresh state
+      });
+  }, [session?.user?.id]);
+
+  // Sync to KV when state changes (authenticated users only)
+  useEffect(() => {
+    if (!hydratedRef.current || !session?.user?.id) return;
+    // Sync every state change directly to database
+    syncToServer(state);
+  }, [state, session?.user?.id]);
 
   // Apply theme class on every settings.theme change
   useEffect(() => {
