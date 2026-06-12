@@ -137,24 +137,61 @@ export function useJaapCount() {
     });
   }, [settings.beadsPerMala, syncToDatabase]);
 
-  // Add jaaps (for bulk add)
+  // Add jaaps (for bulk add, can add to past dates)
   const addJaaps = useCallback(
-    (amount: number) => {
+    (amount: number, targetDate?: string) => {
       setData((prev) => {
-        const newBeads = prev.todayBeads + amount;
-        const newMalas = Math.floor(newBeads / settings.beadsPerMala);
-        const nextBead = newBeads % settings.beadsPerMala;
+        const date = targetDate ?? prev.todayDate;
+        const isToday = date === prev.todayDate;
 
-        syncToDatabase(newBeads, newMalas);
+        if (isToday) {
+          // Adding to today
+          const newBeads = prev.todayBeads + amount;
+          const newMalas = Math.floor(newBeads / settings.beadsPerMala);
+          const nextBead = newBeads % settings.beadsPerMala;
 
-        return {
-          ...prev,
-          todayBeads: newBeads,
-          todayMalas: newMalas,
-          currentBead: nextBead,
-          lifetimeBeads: prev.lifetimeBeads + amount,
-          lifetimeMalas: newMalas,
-        };
+          syncToDatabase(newBeads, newMalas);
+
+          return {
+            ...prev,
+            todayBeads: newBeads,
+            todayMalas: newMalas,
+            currentBead: nextBead,
+            lifetimeBeads: prev.lifetimeBeads + amount,
+            lifetimeMalas: prev.lifetimeMalas + (newMalas - prev.todayMalas),
+          };
+        } else {
+          // Adding to past date
+          const existing = prev.history[date];
+          const prevBeads = existing?.beads ?? 0;
+          const prevMalas = existing?.malas ?? 0;
+          const newBeads = prevBeads + amount;
+          const newMalas = Math.floor(newBeads / settings.beadsPerMala);
+
+          const newHistory = {
+            ...prev.history,
+            [date]: { beads: newBeads, malas: newMalas },
+          };
+
+          // Sync the past date
+          fetch("/api/jaap/save-daily", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              date,
+              beads: newBeads,
+              malas: newMalas,
+              clientTimestamp: new Date().toISOString(),
+            }),
+          }).catch((error) => console.error("Failed to sync past date:", error));
+
+          return {
+            ...prev,
+            history: newHistory,
+            lifetimeBeads: prev.lifetimeBeads + amount,
+            lifetimeMalas: prev.lifetimeMalas + (newMalas - prevMalas),
+          };
+        }
       });
     },
     [settings.beadsPerMala, syncToDatabase]

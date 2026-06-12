@@ -36,7 +36,7 @@ export default function ChantArea() {
     longPressTimer.current = window.setTimeout(() => {
       longPressFired.current = true;
       undo();
-      vibrate(state.settings.haptics, [10, 40, 10]);
+      vibrate(settings.haptics, [10, 40, 10]);
     }, 550);
   }
 
