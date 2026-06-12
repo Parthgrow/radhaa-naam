@@ -235,6 +235,7 @@ export function JaapProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, freshState);
   const { data: session } = useSession();
   const hydratedRef = useRef(false);
+  const hydratedFromDBRef = useRef(false);
   const malaCompletionsRef = useRef(0);
   const prevLifetimeMalasRef = useRef(state.lifetimeMalas);
 
@@ -275,17 +276,20 @@ export function JaapProvider({ children }: { children: ReactNode }) {
           });
         }
         // If no data in DB, use fresh state (which we start with)
+        // Mark as hydrated from DB - now safe to sync user changes
+        hydratedFromDBRef.current = true;
       })
       .catch((error) => {
         console.error("Failed to fetch today's data from database:", error);
-        // On error, continue with fresh state
+        // On error, mark as hydrated anyway (with fresh state)
+        hydratedFromDBRef.current = true;
       });
   }, [session?.user?.id]);
 
-  // Sync to KV when state changes (authenticated users only)
+  // Sync to KV when state changes (only after hydrating from DB)
   useEffect(() => {
-    if (!hydratedRef.current || !session?.user?.id) return;
-    // Sync every state change directly to database
+    if (!hydratedFromDBRef.current || !session?.user?.id) return;
+    // Only sync user-made changes, not the initial state
     syncToServer(state);
   }, [state, session?.user?.id]);
 
