@@ -6,7 +6,7 @@ import { playBell, vibrate } from "@/lib/sounds";
 import BeadRing from "./BeadRing";
 
 export default function ChantArea() {
-  const { data, settings, count, undo } = useJaapCount();
+  const { data, settings, count, undo, todayLoading } = useJaapCount();
   const [pulseKey, setPulseKey] = useState(0);
   const [burstKey, setBurstKey] = useState<number | undefined>(undefined);
   const [showFloat, setShowFloat] = useState<{ id: number } | null>(null);
@@ -109,6 +109,7 @@ export default function ChantArea() {
           total={settings.beadsPerMala}
           pulseKey={pulseKey}
           burstKey={burstKey}
+          isLoading={todayLoading}
         />
         {showFloat && (
           <span

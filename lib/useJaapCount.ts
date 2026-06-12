@@ -49,16 +49,16 @@ export function useJaapCount() {
     history: {},
   });
   const [settings, setSettings] = useState<JaapSettings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState(true);
+  const [todayLoading, setTodayLoading] = useState(true);
 
   // Fetch today's data and history from database on login
   useEffect(() => {
     if (!session?.user?.id) {
-      setIsLoading(false);
+      setTodayLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    setTodayLoading(true);
     const today = todayKey();
 
     Promise.all([
@@ -80,11 +80,11 @@ export function useJaapCount() {
           lifetimeMalas: malas,
           history,
         });
-        setIsLoading(false);
+        setTodayLoading(false);
       })
       .catch((error) => {
         console.error("Failed to fetch jaap data:", error);
-        setIsLoading(false);
+        setTodayLoading(false);
       });
   }, [session?.user?.id, settings.beadsPerMala]);
 
@@ -267,7 +267,7 @@ export function useJaapCount() {
     // Data
     data,
     settings,
-    isLoading,
+    todayLoading,
 
     // Actions
     count,
