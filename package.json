@@ -10,10 +10,12 @@
   },
   "dependencies": {
     "@vercel/kv": "^1.0.1",
+    "dodopayments": "^2.36.0",
     "next": "16.2.7",
     "next-auth": "^4.24.13",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "svix": "^1.95.2",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
