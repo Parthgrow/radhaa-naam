@@ -1,21 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useJaapCount } from "@/lib/useJaapCount";
-import SettingsSheet from "./SettingsSheet";
 import HistorySheet from "./HistorySheet";
 import AddJaapsSheet from "./AddJaapsSheet";
 import FriendsSheet from "./FriendsSheet";
+import NotificationCenter from "./NotificationCenter";
 import UserProfile from "./UserProfile";
 
 export default function TopBar() {
   const { resetBead } = useJaapCount();
   const { data: session } = useSession();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await fetch("/api/notifications");
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 10000);
+
+    return () => clearInterval(interval);
+  }, [session]);
 
   return (
     <>
@@ -34,23 +56,32 @@ export default function TopBar() {
             <CalendarIcon />
           </IconBtn>
           {session && (
-            <IconBtn onClick={() => setFriendsOpen(true)} label="Saangh">
-              <PeopleIcon />
-            </IconBtn>
+            <>
+              <div className="relative">
+                <IconBtn onClick={() => setNotificationsOpen(true)} label="Notifications">
+                  <BellIcon />
+                </IconBtn>
+                {unreadCount > 0 && (
+                  <div className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full text-xs font-bold text-white flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </div>
+                )}
+              </div>
+              <IconBtn onClick={() => setFriendsOpen(true)} label="Saangh">
+                <PeopleIcon />
+              </IconBtn>
+            </>
           )}
-          <IconBtn onClick={resetBead} label="Reset current bead">
+          {/* <IconBtn onClick={resetBead} label="Reset current bead">
             <RefreshIcon />
-          </IconBtn>
-          <IconBtn onClick={() => setSettingsOpen(true)} label="Settings">
-            <GearIcon />
-          </IconBtn>
+          </IconBtn> */}
           {session && <UserProfile email={session.user?.email} name={session.user?.name} />}
         </div>
       </header>
-      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
       <AddJaapsSheet open={addOpen} onClose={() => setAddOpen(false)} />
       <FriendsSheet open={friendsOpen} onClose={() => setFriendsOpen(false)} />
+      <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </>
   );
 }
@@ -146,6 +177,20 @@ function PeopleIcon() {
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );

@@ -55,3 +55,14 @@ export interface UserSettings {
   theme: "lotus" | "dark" | "auto";
   updatedAt: string;
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: "friend_request_received" | "friend_request_accepted";
+  relatedEntityId: string;
+  relatedUserId: string;
+  read: boolean;
+  createdAt: string;
+  dismissedAt?: string;
+}

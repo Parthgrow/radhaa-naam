@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import { kv } from "./client";
 import type { FriendRequest, User } from "./types";
 import { getUser } from "./users";
+import { createNotification } from "./notifications";
 
 const PROJECT_PREFIX = "radha";
 
@@ -58,6 +59,8 @@ export async function sendFriendRequest(
     await kv.sadd(getPendingOutgoingKey(fromUserId), requestId);
     await kv.sadd(getPendingIncomingKey(toUserId), requestId);
 
+    await createNotification(toUserId, "friend_request_received", requestId, fromUserId);
+
     return request;
   } catch (error) {
     console.error("Error sending friend request:", error);
@@ -83,6 +86,8 @@ export async function acceptFriendRequest(
     await kv.sadd(getFriendsKey(req.toUserId), req.fromUserId);
     await kv.srem(getPendingIncomingKey(actingUserId), requestId);
     await kv.srem(getPendingOutgoingKey(req.fromUserId), requestId);
+
+    await createNotification(req.fromUserId, "friend_request_accepted", requestId, actingUserId);
 
     return true;
   } catch (error) {

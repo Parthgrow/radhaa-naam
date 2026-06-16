@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { signOut } from "next-auth/react";
+import SettingsSheet from "./SettingsSheet";
 
 interface UserProfileProps {
   email?: string | null;
@@ -10,6 +11,7 @@ interface UserProfileProps {
 
 export default function UserProfile({ email, name }: UserProfileProps) {
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const gravatarUrl = useMemo(() => {
     if (!email) return "";
@@ -41,6 +43,15 @@ export default function UserProfile({ email, name }: UserProfileProps) {
             <p className="text-xs text-gray-500">{email}</p>
           </div>
           <button
+            onClick={() => {
+              setOpen(false);
+              setSettingsOpen(true);
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition border-b border-gray-100"
+          >
+            Settings
+          </button>
+          <button
             onClick={async () => {
               setOpen(false);
               await signOut({ callbackUrl: "/login", redirect: true });
@@ -51,6 +62,7 @@ export default function UserProfile({ email, name }: UserProfileProps) {
           </button>
         </div>
       )}
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
