@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[Webhook] Verifying with Svix...');
 
-    let event;
+    let event: any;
     try {
       event = svix.verify(body, headers);
     } catch (err) {

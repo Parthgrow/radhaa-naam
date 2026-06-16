@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      sessionId: checkoutSession.id,
+      sessionId: checkoutSession.session_id,
       checkoutUrl: checkoutSession.checkout_url,
     });
   } catch (error) {
