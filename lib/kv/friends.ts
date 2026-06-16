@@ -36,10 +36,9 @@ export async function sendFriendRequest(
 
     const outgoing = await kv.smembers<string[]>(getPendingOutgoingKey(fromUserId));
     for (const reqId of outgoing) {
-      const req = await kv.get<string>(getFriendRequestKey(reqId));
+      const req = await kv.get<FriendRequest>(getFriendRequestKey(reqId));
       if (req) {
-        const parsed = JSON.parse(req) as FriendRequest;
-        if (parsed.toUserId === toUserId && parsed.status === "pending") {
+        if (req.toUserId === toUserId && req.status === "pending") {
           return null;
         }
       }
@@ -152,6 +151,31 @@ export async function getPendingRequests(
     return pending;
   } catch (error) {
     console.error("Error getting pending requests:", error);
+    return [];
+  }
+}
+
+export async function getPendingSentRequests(
+  userId: string
+): Promise<Array<{ request: FriendRequest; to: User }>> {
+  try {
+    const requestIds = await kv.smembers<string[]>(getPendingOutgoingKey(userId));
+    const pending: Array<{ request: FriendRequest; to: User }> = [];
+
+    for (const reqId of requestIds) {
+      const reqData = await kv.get<FriendRequest>(getFriendRequestKey(reqId));
+      if (reqData) {
+        const req = reqData;
+        const to = await getUser(req.toUserId);
+        if (to) {
+          pending.push({ request: req, to });
+        }
+      }
+    }
+
+    return pending;
+  } catch (error) {
+    console.error("Error getting pending sent requests:", error);
     return [];
   }
 }

@@ -14,6 +14,7 @@ interface FriendWithBeads {
 export default function FriendsSheet({ open, onClose }: Props) {
   const [friends, setFriends] = useState<FriendWithBeads[]>([]);
   const [pending, setPending] = useState<Array<{ request: FriendRequest; from: User }>>([]);
+  const [pendingSent, setPendingSent] = useState<Array<{ request: FriendRequest; to: User }>>([]);
   const [recommendations, setRecommendations] = useState<User[]>([]);
   const [myWeeklyBeads, setMyWeeklyBeads] = useState(0);
   const [searchInput, setSearchInput] = useState("");
@@ -23,9 +24,10 @@ export default function FriendsSheet({ open, onClose }: Props) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [listRes, pendingRes, recsRes] = await Promise.all([
+      const [listRes, pendingRes, pendingSentRes, recsRes] = await Promise.all([
         fetch("/api/friends/list"),
         fetch("/api/friends/pending"),
+        fetch("/api/friends/pending-sent"),
         fetch("/api/friends/recommendations"),
       ]);
 
@@ -47,6 +49,11 @@ export default function FriendsSheet({ open, onClose }: Props) {
       if (pendingRes.ok) {
         const data = await pendingRes.json();
         setPending(data.pending || []);
+      }
+
+      if (pendingSentRes.ok) {
+        const data = await pendingSentRes.json();
+        setPendingSent(data.pendingSent || []);
       }
 
       if (recsRes.ok) {
@@ -208,6 +215,26 @@ export default function FriendsSheet({ open, onClose }: Props) {
           </Section>
         )}
 
+        {pendingSent.length > 0 && (
+          <Section title="Requests Sent">
+            <div className="space-y-2">
+              {pendingSent.map((p) => (
+                <div
+                  key={p.request.id}
+                  className="flex items-center justify-between rounded-lg bg-surface px-4 py-3 ring-1 ring-ring/40"
+                >
+                  <div>
+                    <div className="text-sm text-foreground">
+                      {p.to.name || p.to.username || p.to.email}
+                    </div>
+                    <div className="text-xs text-muted mt-1">Pending</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
         <Section title="Add Friend">
           <form onSubmit={handleAddFriend} className="flex gap-2">
             <input
@@ -253,7 +280,7 @@ export default function FriendsSheet({ open, onClose }: Props) {
           </Section>
         )}
 
-        {friends.length === 0 && pending.length === 0 && recommendations.length === 0 && !loading && (
+        {friends.length === 0 && pending.length === 0 && pendingSent.length === 0 && recommendations.length === 0 && !loading && (
           <div className="text-center py-6">
             <p className="text-sm text-muted">
               Start by adding a friend or discovering new people!
