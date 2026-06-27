@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import RefreshSubscriptionOnMount from '@/components/RefreshSubscriptionOnMount';
 
 export default async function SuccessPage() {
   const session = await auth();
@@ -11,6 +12,7 @@ export default async function SuccessPage() {
 
   return (
     <main className="min-h-svh bg-gray-50 flex items-center justify-center px-4">
+      <RefreshSubscriptionOnMount />
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
         <div className="mb-6">
           <div className="inline-block p-3 bg-green-100 rounded-full mb-4">

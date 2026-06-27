@@ -8,6 +8,20 @@ export interface User {
   updatedAt: string;
 }
 
+/** Raw, persisted subscription/trial state for a user. */
+export interface SubscriptionRecord {
+  // Lifecycle status as stored. `cancelled` means "cancelled but may still be
+  // within the paid period" — getAccessState resolves that to active/expired.
+  status: "trialing" | "active" | "past_due" | "expired" | "cancelled";
+  trialEndsAt: string | null; // ISO — set at signup
+  currentPeriodEnd: string | null; // ISO — Dodo next_billing_date
+  cancelAtPeriodEnd: boolean;
+  subscriptionId: string | null;
+  productId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WeeklySync {
   userId: string;
   weekStart: string;

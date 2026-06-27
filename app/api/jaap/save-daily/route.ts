@@ -1,12 +1,13 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import { saveDailyRecord, getDailyRecord } from "@/lib/kv/daily-jaap";
+import { requireActiveAccess } from "@/lib/subscription/access";
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Counting / adding jaaps is a premium feature — requires an active trial or
+  // subscription. Returns 401 (unauthenticated) or 402 (subscription required).
+  const gate = await requireActiveAccess();
+  if (!gate.ok) return gate.response;
 
   try {
     const body = await req.json();
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     }
 
     // Save the record
-    const saved = await saveDailyRecord(session.user.id, date, beads, malas, clientTimestamp);
+    const saved = await saveDailyRecord(gate.userId, date, beads, malas, clientTimestamp);
 
     return Response.json({
       success: true,

@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
-import { kv } from '@vercel/kv';
+import {
+  setSubscriptionRecord,
+  indexSubscription,
+  getUserIdBySubscription,
+} from '@/lib/kv/subscriptions';
+import type { SubscriptionRecord } from '@/lib/kv/types';
+
+// Map a Dodo subscription event onto our stored status. Returns the patch to
+// apply, or null to ignore the event.
+function subscriptionPatch(
+  eventType: string,
+  data: any
+): Partial<SubscriptionRecord> | null {
+  const common = {
+    subscriptionId: data.subscription_id ?? null,
+    productId: data.product_id ?? null,
+    currentPeriodEnd: data.next_billing_date ?? null,
+    cancelAtPeriodEnd: Boolean(data.cancel_at_next_billing_date),
+  };
+
+  switch (eventType) {
+    case 'subscription.active':
+    case 'subscription.renewed':
+      return { ...common, status: 'active' };
+    case 'subscription.on_hold':
+      return { ...common, status: 'past_due' };
+    case 'subscription.cancelled':
+      // Keep access until currentPeriodEnd; getAccessState resolves it.
+      return { ...common, status: 'cancelled', cancelAtPeriodEnd: true };
+    case 'subscription.failed':
+    case 'subscription.expired':
+      return { ...common, status: 'expired' };
+    case 'subscription.updated':
+      // Trust Dodo's status field for generic updates.
+      if (data.status === 'active') return { ...common, status: 'active' };
+      if (data.status === 'on_hold') return { ...common, status: 'past_due' };
+      if (data.status === 'cancelled')
+        return { ...common, status: 'cancelled', cancelAtPeriodEnd: true };
+      if (data.status === 'expired' || data.status === 'failed')
+        return { ...common, status: 'expired' };
+      return null;
+    default:
+      return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,70 +67,53 @@ export async function POST(request: NextRequest) {
       'webhook-signature': request.headers.get('webhook-signature') || '',
     };
 
-    console.log('[Webhook] Verifying with Svix...');
-
     let event: any;
     try {
       event = svix.verify(body, headers);
     } catch (err) {
       console.error('[Webhook] Svix verification failed:', err);
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     console.log('[Webhook] Event verified:', event.type);
 
-    if (event.type === 'checkout.session.completed') {
-      const { id, metadata, customer, status } = event.data as any;
+    const data = event.data as any;
+    const userId = data?.metadata?.userId as string | undefined;
 
-      if (status === 'success' && metadata?.userId) {
-        await kv.hset(
-          `user:${metadata.userId}:subscription`,
-          {
-            sessionId: id,
-            productId: metadata.productId,
-            email: customer.email,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        );
-
-        console.log(
-          `✓ Payment successful for user ${metadata.userId}, product ${metadata.productId}`
-        );
+    // Subscription lifecycle events (payload_type: 'Subscription').
+    if (typeof event.type === 'string' && event.type.startsWith('subscription.')) {
+      if (!userId) {
+        console.warn(`[Webhook] ${event.type} missing metadata.userId, ignoring`);
+        return NextResponse.json({ received: true });
       }
+      const patch = subscriptionPatch(event.type, data);
+      if (patch) {
+        // Idempotent: re-applying the same patch is a no-op.
+        await setSubscriptionRecord(userId, patch);
+        console.log(`✓ ${event.type} → ${patch.status} for user ${userId}`);
+      }
+      return NextResponse.json({ received: true });
     }
 
-    if (event.type === 'payment.completed' || event.type === 'payment.successful') {
-      const { id, metadata, customer } = event.data as any;
-
-      if (metadata?.userId) {
-        await kv.hset(
-          `user:${metadata.userId}:subscription`,
-          {
-            sessionId: id,
-            productId: metadata.productId,
-            email: customer.email,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        );
-
-        console.log(
-          `✓ Payment completed for user ${metadata.userId}`
-        );
+    // A successful one-off/first payment also confirms an active subscription.
+    if (event.type === 'payment.succeeded') {
+      if (userId) {
+        await setSubscriptionRecord(userId, {
+          status: 'active',
+          subscriptionId: data.subscription_id ?? null,
+          productId: data.product_id ?? null,
+        });
+        console.log(`✓ payment.succeeded → active for user ${userId}`);
       }
+      return NextResponse.json({ received: true });
     }
 
-    if (event.type === 'subscription.updated' || event.type === 'subscription.created') {
-      const { subscription_id, metadata, status } = event.data as any;
-      if (metadata?.userId && status === 'active') {
-        console.log(`✓ Subscription active for user ${metadata.userId}`);
+    if (event.type === 'payment.failed') {
+      if (userId) {
+        await setSubscriptionRecord(userId, { status: 'past_due' });
+        console.log(`✓ payment.failed → past_due for user ${userId}`);
       }
+      return NextResponse.json({ received: true });
     }
 
     return NextResponse.json({ received: true });

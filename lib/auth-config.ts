@@ -2,6 +2,8 @@ import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { v4 as uuid } from "uuid";
 import { findUserByEmail, createUser } from "@/lib/kv/users";
+import { setSubscriptionRecord } from "@/lib/kv/subscriptions";
+import { TRIAL_DAYS } from "@/lib/dodo-payments";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -23,6 +25,14 @@ export const authOptions: NextAuthOptions = {
         if (!existingUser) {
           const userId = uuid();
           await createUser(userId, user.name || null, user.email);
+          // Grant the no-card free trial at signup.
+          const trialEndsAt = new Date(
+            Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000
+          ).toISOString();
+          await setSubscriptionRecord(userId, {
+            status: "trialing",
+            trialEndsAt,
+          });
           user.id = userId;
         } else {
           user.id = existingUser.id;

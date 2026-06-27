@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useJaapCount } from "@/lib/useJaapCount";
+import { useSubscription } from "@/lib/subscription/SubscriptionProvider";
 import HistorySheet from "./HistorySheet";
 import AddJaapsSheet from "./AddJaapsSheet";
 import FriendsSheet from "./FriendsSheet";
@@ -12,6 +13,7 @@ import UserProfile from "./UserProfile";
 export default function TopBar() {
   const { resetBead } = useJaapCount();
   const { data: session } = useSession();
+  const { view } = useSubscription();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
@@ -49,9 +51,11 @@ export default function TopBar() {
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <IconBtn onClick={() => setAddOpen(true)} label="Add jaaps">
-            <PlusIcon />
-          </IconBtn>
+          {view.isActive && (
+            <IconBtn onClick={() => setAddOpen(true)} label="Add jaaps">
+              <PlusIcon />
+            </IconBtn>
+          )}
           <IconBtn onClick={() => setHistoryOpen(true)} label="History">
             <CalendarIcon />
           </IconBtn>

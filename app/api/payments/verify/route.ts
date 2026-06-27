@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { getAccessState } from '@/lib/subscription/access';
 
 export async function GET() {
   try {
@@ -13,13 +13,15 @@ export async function GET() {
       );
     }
 
-    const subscription = await kv.hgetall(
-      `user:${session.user.id}:subscription`
-    );
+    const state = await getAccessState(session.user.id);
 
     return NextResponse.json({
-      hasActiveSubscription: subscription && subscription.status === 'active',
-      subscription: subscription || null,
+      status: state.status,
+      trialEndsAt: state.trialEndsAt,
+      currentPeriodEnd: state.currentPeriodEnd,
+      productId: state.productId,
+      // Back-compat for any older client still reading this field.
+      hasActiveSubscription: state.hasAccess,
     });
   } catch (error) {
     console.error('Error verifying payment:', error);

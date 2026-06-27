@@ -3,6 +3,7 @@ import ChantArea from "@/components/ChantArea";
 import StatsBar from "@/components/StatsBar";
 import SevenDayStrip from "@/components/SevenDayStrip";
 import WeeklySyncTrigger from "@/components/WeeklySyncTrigger";
+import FeatureGate from "@/components/FeatureGate";
 
 export default function Page() {
   return (
@@ -10,7 +11,9 @@ export default function Page() {
       <WeeklySyncTrigger />
       <TopBar />
       <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
-        <ChantArea />
+        <FeatureGate>
+          <ChantArea />
+        </FeatureGate>
       </div>
       <StatsBar />
       <SevenDayStrip />

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Tiro_Devanagari_Hindi } from "next/font/google";
 import "./globals.css";
 import PWARegister from "@/components/PWARegister";
+import TrialBanner from "@/components/TrialBanner";
 import { Providers } from "./providers";
 
 const sans = Inter({
@@ -52,7 +53,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <TrialBanner />
+          {children}
+        </Providers>
         <PWARegister />
       </body>
     </html>
