@@ -36,12 +36,18 @@ export interface JWTPayload {
   exp?: number;
 }
 
+/** Legacy day record (radha:daily:*), read-only since day totals moved to a hash. */
 export interface DailyJaap {
   userId: string;
   date: string;          // YYYY-MM-DD
   beads: number;
   malas: number;
   lastSyncedAt: string;  // ISO timestamp for conflict resolution
+}
+
+export interface DayTotals {
+  beads: number;
+  malas: number;
 }
 
 export interface UserSettings {
