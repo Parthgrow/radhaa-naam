@@ -12,17 +12,19 @@ export default function ChantArea() {
   const [showFloat, setShowFloat] = useState<{ id: number } | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
-  const lastMalaSeen = useRef(data.todayMalas);
+  const lastMalaSeen = useRef<number | null>(null);
 
-  // Trigger burst + bell when a mala completes
+  // Trigger burst + bell when a mala completes (not on load, undo or day rollover)
   useEffect(() => {
-    if (data.todayMalas !== lastMalaSeen.current && data.todayMalas > 0) {
-      lastMalaSeen.current = data.todayMalas;
+    if (todayLoading) return;
+    const prev = lastMalaSeen.current;
+    lastMalaSeen.current = data.todayMalas;
+    if (prev !== null && data.todayMalas > prev) {
       setBurstKey(data.todayMalas);
       playBell(settings.sound);
       vibrate(settings.haptics, [20, 60, 40]);
     }
-  }, [data.todayMalas, settings.sound, settings.haptics]);
+  }, [data.todayMalas, todayLoading, settings.sound, settings.haptics]);
 
   function handleCount() {
     count();

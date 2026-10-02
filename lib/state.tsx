@@ -8,11 +8,11 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import { useSession } from "next-auth/react";
-import { todayKey } from "./date";
-import { syncToServer, registerSyncOnLeave } from "./sync";
+import { addDays, todayKey } from "./date";
 
 export type Theme = "lotus" | "dark" | "auto";
 
@@ -32,16 +32,14 @@ export type DailyRecord = {
   malas: number;      // completed malas that day
 };
 
-export type PersistedState = {
-  version: 1;
+export type JaapState = {
   currentBead: number;       // 0..beadsPerMala-1
   todayDate: string;         // YYYY-MM-DD of the active session
-  todayBeads: number;        // counter for today (= history[today].beads on save)
+  todayBeads: number;        // counter for today
   todayMalas: number;        // mala counter for today
   lifetimeBeads: number;
   lifetimeMalas: number;
-  history: Record<string, DailyRecord>;
-  lastUndoableBead: number | null; // previous bead value for single-step undo
+  history: Record<string, DailyRecord>; // past days only — today lives in today*
   settings: Settings;
 };
 
@@ -55,9 +53,10 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "lotus",
 };
 
-function freshState(): PersistedState {
+const HISTORY_DAYS = 90;
+
+function freshState(): JaapState {
   return {
-    version: 1,
     currentBead: 0,
     todayDate: todayKey(),
     todayBeads: 0,
@@ -65,25 +64,24 @@ function freshState(): PersistedState {
     lifetimeBeads: 0,
     lifetimeMalas: 0,
     history: {},
-    lastUndoableBead: null,
     settings: { ...DEFAULT_SETTINGS },
   };
 }
 
 type Action =
-  | { type: "HYDRATE"; payload: PersistedState }
+  | { type: "HYDRATE"; payload: JaapState }
   | { type: "TICK_DAY"; date: string }
   | { type: "COUNT" }
   | { type: "ADD_JAAPS"; amount: number; date?: string }
   | { type: "UNDO" }
   | { type: "RESET_BEAD" }
   | { type: "NEXT_MALA" }   // manual mala advance
-  | { type: "RESET_ALL" }
+  | { type: "RESET_TODAY" }
   | { type: "UPDATE_SETTINGS"; patch: Partial<Settings> };
 
-function applyDayRollover(state: PersistedState, today: string): PersistedState {
+function applyDayRollover(state: JaapState, today: string): JaapState {
   if (state.todayDate === today) return state;
-  // archive yesterday's tally into history
+  // archive the finished day's tally into history
   const history = { ...state.history };
   if (state.todayBeads > 0) {
     history[state.todayDate] = {
@@ -99,11 +97,21 @@ function applyDayRollover(state: PersistedState, today: string): PersistedState 
     todayBeads: 0,
     todayMalas: 0,
     currentBead: 0,
-    lastUndoableBead: null,
   };
 }
 
-function reducer(state: PersistedState, action: Action): PersistedState {
+/** Adding beads to a past day recomputes its malas from the new bead total. */
+function addToPastDay(
+  existing: DailyRecord | undefined,
+  date: string,
+  amount: number,
+  beadsPerMala: number
+): DailyRecord {
+  const beads = (existing?.beads ?? 0) + amount;
+  return { date, beads, malas: Math.floor(beads / beadsPerMala) };
+}
+
+function reducer(state: JaapState, action: Action): JaapState {
   switch (action.type) {
     case "HYDRATE":
       return applyDayRollover(action.payload, todayKey());
@@ -112,24 +120,15 @@ function reducer(state: PersistedState, action: Action): PersistedState {
       return applyDayRollover(state, action.date);
 
     case "COUNT": {
-      const beadsPerMala = state.settings.beadsPerMala;
-      const prevBead = state.currentBead;
-      let nextBead = prevBead + 1;
-      let malaJustCompleted = false;
-      if (nextBead >= beadsPerMala) {
-        nextBead = 0;
-        malaJustCompleted = true;
-      }
-      const next: PersistedState = {
+      const malaJustCompleted = state.currentBead + 1 >= state.settings.beadsPerMala;
+      return {
         ...state,
-        currentBead: nextBead,
+        currentBead: malaJustCompleted ? 0 : state.currentBead + 1,
         todayBeads: state.todayBeads + 1,
         lifetimeBeads: state.lifetimeBeads + 1,
         todayMalas: state.todayMalas + (malaJustCompleted ? 1 : 0),
         lifetimeMalas: state.lifetimeMalas + (malaJustCompleted ? 1 : 0),
-        lastUndoableBead: prevBead,
       };
-      return next;
     }
 
     case "ADD_JAAPS": {
@@ -141,23 +140,15 @@ function reducer(state: PersistedState, action: Action): PersistedState {
       // Past-date path: write to history, don't touch currentBead
       if (targetDate !== state.todayDate) {
         const existing = state.history[targetDate];
-        const prevBeads = existing?.beads ?? 0;
-        const prevMalas = existing?.malas ?? 0;
-        const newBeads = prevBeads + amount;
-        const newMalas = Math.floor(newBeads / beadsPerMala);
+        const updated = addToPastDay(existing, targetDate, amount, beadsPerMala);
         return {
           ...state,
-          history: {
-            ...state.history,
-            [targetDate]: { date: targetDate, beads: newBeads, malas: newMalas },
-          },
+          history: { ...state.history, [targetDate]: updated },
           lifetimeBeads: state.lifetimeBeads + amount,
-          lifetimeMalas: state.lifetimeMalas + (newMalas - prevMalas),
-          lastUndoableBead: null,
+          lifetimeMalas: state.lifetimeMalas + (updated.malas - (existing?.malas ?? 0)),
         };
       }
 
-      // Today path: unchanged
       const total = state.currentBead + amount;
       const malasCompleted = Math.floor(total / beadsPerMala);
       return {
@@ -167,29 +158,28 @@ function reducer(state: PersistedState, action: Action): PersistedState {
         lifetimeBeads: state.lifetimeBeads + amount,
         todayMalas: state.todayMalas + malasCompleted,
         lifetimeMalas: state.lifetimeMalas + malasCompleted,
-        lastUndoableBead: null, // bulk add isn't single-step undoable
       };
     }
 
     case "UNDO": {
-      if (state.lastUndoableBead === null) return state;
-      // Reverse the last COUNT: if the previous count completed a mala (we wrapped
-      // from beadsPerMala-1 → 0), undo the mala counter too.
-      const beadsPerMala = state.settings.beadsPerMala;
-      const wrapped = state.currentBead === 0 && state.lastUndoableBead === beadsPerMala - 1;
+      // Step back one bead. At bead 0 with a completed mala, step back into the
+      // last bead of the previous mala and un-complete it. Repeatable.
+      if (state.todayBeads === 0) return state;
+      const crossesMala = state.currentBead === 0 && state.todayMalas > 0;
       return {
         ...state,
-        currentBead: state.lastUndoableBead,
-        todayBeads: Math.max(0, state.todayBeads - 1),
+        currentBead: crossesMala
+          ? state.settings.beadsPerMala - 1
+          : Math.max(0, state.currentBead - 1),
+        todayBeads: state.todayBeads - 1,
         lifetimeBeads: Math.max(0, state.lifetimeBeads - 1),
-        todayMalas: Math.max(0, state.todayMalas - (wrapped ? 1 : 0)),
-        lifetimeMalas: Math.max(0, state.lifetimeMalas - (wrapped ? 1 : 0)),
-        lastUndoableBead: null,
+        todayMalas: state.todayMalas - (crossesMala ? 1 : 0),
+        lifetimeMalas: Math.max(0, state.lifetimeMalas - (crossesMala ? 1 : 0)),
       };
     }
 
     case "RESET_BEAD":
-      return { ...state, currentBead: 0, lastUndoableBead: null };
+      return { ...state, currentBead: 0 };
 
     case "NEXT_MALA":
       return {
@@ -197,11 +187,17 @@ function reducer(state: PersistedState, action: Action): PersistedState {
         currentBead: 0,
         todayMalas: state.todayMalas + 1,
         lifetimeMalas: state.lifetimeMalas + 1,
-        lastUndoableBead: null,
       };
 
-    case "RESET_ALL":
-      return { ...freshState(), settings: state.settings };
+    case "RESET_TODAY":
+      return {
+        ...state,
+        currentBead: 0,
+        todayBeads: 0,
+        todayMalas: 0,
+        lifetimeBeads: Math.max(0, state.lifetimeBeads - state.todayBeads),
+        lifetimeMalas: Math.max(0, state.lifetimeMalas - state.todayMalas),
+      };
 
     case "UPDATE_SETTINGS": {
       const settings = { ...state.settings, ...action.patch };
@@ -216,86 +212,125 @@ function reducer(state: PersistedState, action: Action): PersistedState {
   }
 }
 
+async function postDailyRecord(date: string, beads: number, malas: number) {
+  try {
+    const res = await fetch("/api/jaap/save-daily", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, beads, malas, clientTimestamp: new Date().toISOString() }),
+    });
+    if (!res.ok) console.warn(`Sync failed: ${res.status} ${res.statusText}`);
+  } catch (error) {
+    console.error("Sync error:", error);
+  }
+}
+
 type JaapContextValue = {
-  state: PersistedState;
-  hydrated: boolean;
+  state: JaapState;
+  /** True until the session and the user's data have loaded. */
+  loading: boolean;
   count: () => void;
   addJaaps: (amount: number, date?: string) => void;
   undo: () => void;
   resetBead: () => void;
   nextMala: () => void;
-  resetAll: () => void;
+  resetToday: () => void;
   updateSettings: (patch: Partial<Settings>) => void;
-  malaJustCompleted: number; // increment counter — components use as effect dep
 };
 
 const JaapContext = createContext<JaapContextValue | null>(null);
 
 export function JaapProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, freshState);
-  const { data: session } = useSession();
-  const hydratedRef = useRef(false);
-  const hydratedFromDBRef = useRef(false);
-  const malaCompletionsRef = useRef(0);
-  const prevLifetimeMalasRef = useRef(state.lifetimeMalas);
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id;
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
-  // Hydrate from database once on mount
-  useEffect(() => {
-    hydratedRef.current = true;
-    // Apply theme class with default
-    applyThemeClass(DEFAULT_SETTINGS.theme);
-    // Register sync handlers
-    registerSyncOnLeave();
-  }, []);
+  const stateRef = useRef(state);
+  // Only write to the server once we know what it holds; otherwise a failed
+  // load would overwrite the user's saved count with a fresh zero.
+  const canSyncRef = useRef(false);
+  const lastSyncedRef = useRef<{ date: string; beads: number; malas: number } | null>(null);
 
-  // Fetch data from database on login
   useEffect(() => {
-    if (!session?.user?.id || !hydratedRef.current) return;
+    stateRef.current = state;
+  }, [state]);
+
+  // Load today's count + recent history once per signed-in user
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    canSyncRef.current = false;
 
     const today = todayKey();
-    fetch(`/api/jaap/save-daily?date=${today}`)
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success && result.data) {
-          // Got data from database, hydrate with it
-          const dbData = result.data;
-          const todayBeads = dbData.beads ?? 0;
-          // Calculate currentBead from todayBeads
-          const currentBead = todayBeads % DEFAULT_SETTINGS.beadsPerMala;
+    const startDate = todayKey(addDays(new Date(), -HISTORY_DAYS));
 
-          dispatch({
-            type: "HYDRATE",
-            payload: {
-              ...freshState(),
-              todayDate: today,
-              todayBeads,
-              todayMalas: dbData.malas ?? 0,
-              currentBead,
-              settings: DEFAULT_SETTINGS,
-            },
-          });
+    Promise.all([
+      fetch(`/api/jaap/save-daily?date=${today}`),
+      fetch(`/api/jaap/history?startDate=${startDate}&endDate=${today}`),
+    ])
+      .then(async ([todayRes, historyRes]) => {
+        if (!todayRes.ok || !historyRes.ok) {
+          throw new Error(`load failed: ${todayRes.status} / ${historyRes.status}`);
         }
-        // If no data in DB, use fresh state (which we start with)
-        // Mark as hydrated from DB - now safe to sync user changes
-        hydratedFromDBRef.current = true;
+        const [todayResult, historyResult] = await Promise.all([
+          todayRes.json(),
+          historyRes.json(),
+        ]);
+        if (cancelled) return;
+
+        const settings = stateRef.current.settings;
+        const todayBeads: number = todayResult.data?.beads ?? 0;
+        const todayMalas: number = todayResult.data?.malas ?? 0;
+        const history: Record<string, DailyRecord> = { ...(historyResult.data ?? {}) };
+        delete history[today];
+
+        lastSyncedRef.current = { date: today, beads: todayBeads, malas: todayMalas };
+        canSyncRef.current = true;
+        dispatch({
+          type: "HYDRATE",
+          payload: {
+            ...freshState(),
+            todayDate: today,
+            todayBeads,
+            todayMalas,
+            currentBead: todayBeads % settings.beadsPerMala,
+            // TODO: real lifetime totals come from the server (not stored yet)
+            lifetimeBeads: todayBeads,
+            lifetimeMalas: todayMalas,
+            history,
+            settings,
+          },
+        });
       })
       .catch((error) => {
-        console.error("Failed to fetch today's data from database:", error);
-        // On error, mark as hydrated anyway (with fresh state)
-        hydratedFromDBRef.current = true;
+        console.error("Failed to load jaap data:", error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedFor(userId);
       });
-  }, [session?.user?.id]);
 
-  // Sync to KV when state changes (only after hydrating from DB)
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // Save today's count whenever it changes
+  const { todayDate, todayBeads, todayMalas } = state;
   useEffect(() => {
-    if (!hydratedFromDBRef.current || !session?.user?.id) return;
-    // Only sync user-made changes, not the initial state
-    syncToServer(state);
-  }, [state, session?.user?.id]);
+    if (!canSyncRef.current) return;
+    const last = lastSyncedRef.current;
+    if (last && last.date === todayDate && last.beads === todayBeads && last.malas === todayMalas) {
+      return;
+    }
+    lastSyncedRef.current = { date: todayDate, beads: todayBeads, malas: todayMalas };
+    // A fresh day after rollover has nothing to save yet
+    if (last && last.date !== todayDate && todayBeads === 0 && todayMalas === 0) return;
+    postDailyRecord(todayDate, todayBeads, todayMalas);
+  }, [todayDate, todayBeads, todayMalas]);
 
   // Apply theme class on every settings.theme change
   useEffect(() => {
-    if (!hydratedRef.current) return;
     applyThemeClass(state.settings.theme);
   }, [state.settings.theme]);
 
@@ -303,50 +338,51 @@ export function JaapProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const tick = () => {
       const today = todayKey();
-      if (today !== state.todayDate) dispatch({ type: "TICK_DAY", date: today });
+      if (today !== todayDate) dispatch({ type: "TICK_DAY", date: today });
     };
     const id = window.setInterval(tick, 30_000);
-    const onVis = () => tick();
-    document.addEventListener("visibilitychange", onVis);
+    document.addEventListener("visibilitychange", tick);
     return () => {
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
+      document.removeEventListener("visibilitychange", tick);
     };
-  }, [state.todayDate]);
-
-  // Track mala completions for animation triggers
-  if (state.lifetimeMalas > prevLifetimeMalasRef.current) {
-    malaCompletionsRef.current += 1;
-    prevLifetimeMalasRef.current = state.lifetimeMalas;
-  } else if (state.lifetimeMalas < prevLifetimeMalasRef.current) {
-    prevLifetimeMalasRef.current = state.lifetimeMalas;
-  }
+  }, [todayDate]);
 
   const count = useCallback(() => dispatch({ type: "COUNT" }), []);
-  const addJaaps = useCallback((amount: number, date?: string) => dispatch({ type: "ADD_JAAPS", amount, date }), []);
+  const addJaaps = useCallback((amount: number, date?: string) => {
+    const s = stateRef.current;
+    dispatch({ type: "ADD_JAAPS", amount, date });
+    // Today's changes are saved by the effect above; past days are saved here.
+    const n = Math.max(0, Math.floor(amount));
+    if (date && date !== s.todayDate && n > 0 && canSyncRef.current) {
+      const updated = addToPastDay(s.history[date], date, n, s.settings.beadsPerMala);
+      postDailyRecord(date, updated.beads, updated.malas);
+    }
+  }, []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const resetBead = useCallback(() => dispatch({ type: "RESET_BEAD" }), []);
   const nextMala = useCallback(() => dispatch({ type: "NEXT_MALA" }), []);
-  const resetAll = useCallback(() => dispatch({ type: "RESET_ALL" }), []);
+  const resetToday = useCallback(() => dispatch({ type: "RESET_TODAY" }), []);
   const updateSettings = useCallback(
     (patch: Partial<Settings>) => dispatch({ type: "UPDATE_SETTINGS", patch }),
     []
   );
 
+  const loading = status === "loading" || (status === "authenticated" && loadedFor !== userId);
+
   const value = useMemo<JaapContextValue>(
     () => ({
       state,
-      hydrated: hydratedRef.current,
+      loading,
       count,
       addJaaps,
       undo,
       resetBead,
       nextMala,
-      resetAll,
+      resetToday,
       updateSettings,
-      malaJustCompleted: malaCompletionsRef.current,
     }),
-    [state, count, addJaaps, undo, resetBead, nextMala, resetAll, updateSettings]
+    [state, loading, count, addJaaps, undo, resetBead, nextMala, resetToday, updateSettings]
   );
 
   return <JaapContext.Provider value={value}>{children}</JaapContext.Provider>;
@@ -366,22 +402,4 @@ function applyThemeClass(theme: Theme) {
   else if (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
     root.classList.add("theme-dark");
   }
-}
-
-/** Derived selector helpers */
-export function selectGoalNaam(s: PersistedState): number {
-  return s.settings.malaGoal * s.settings.beadsPerMala;
-}
-
-export function selectGoalProgress(s: PersistedState): number {
-  const goal = selectGoalNaam(s);
-  if (goal <= 0) return 0;
-  return Math.min(1, s.todayBeads / goal);
-}
-
-export function selectDailyHistoryMap(s: PersistedState): Record<string, number> {
-  const map: Record<string, number> = {};
-  for (const k of Object.keys(s.history)) map[k] = s.history[k].beads;
-  if (s.todayBeads > 0) map[s.todayDate] = s.todayBeads;
-  return map;
 }

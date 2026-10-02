@@ -32,7 +32,7 @@ export default function HistorySheet({ open, onClose }: Props) {
   }
 
   const recent = Object.entries(state.history)
-    .map(([date, record]) => ({ date, ...record }))
+    .map(([date, record]) => ({ ...record, date }))
     .concat(
       state.todayBeads > 0
         ? [{ date: state.todayDate ?? '', beads: state.todayBeads, malas: state.todayMalas }]

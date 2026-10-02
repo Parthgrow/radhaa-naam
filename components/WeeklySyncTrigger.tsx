@@ -6,30 +6,35 @@ import { useJaapCount } from "@/lib/useJaapCount";
 import { getWeekStart } from "@/lib/kv/week";
 
 export default function WeeklySyncTrigger() {
-  const { data: state } = useJaapCount();
+  const { data: state, todayLoading } = useJaapCount();
   const { data: session } = useSession();
 
+  // Wait until tapping pauses before pushing the weekly total to friends
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || todayLoading) return;
 
-    const weekStart = getWeekStart();
-    const totalBeads = computeWeekBeads(state, weekStart);
-    const totalMalas = computeWeekMalas(state, weekStart);
+    const timer = window.setTimeout(() => {
+      const weekStart = getWeekStart();
+      const totalBeads = computeWeekBeads(state, weekStart);
+      const totalMalas = computeWeekMalas(state, weekStart);
 
-    fetch("/api/friends/sync-week", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ totalBeads, totalMalas }),
-    })
-      .then((r) => {
-        if (!r.ok) {
-          console.warn("Weekly sync failed");
-        }
+      fetch("/api/friends/sync-week", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalBeads, totalMalas }),
       })
-      .catch((error) => {
-        console.error("Weekly sync error:", error);
-      });
-  }, [session?.user?.id, state]);
+        .then((r) => {
+          if (!r.ok) {
+            console.warn("Weekly sync failed");
+          }
+        })
+        .catch((error) => {
+          console.error("Weekly sync error:", error);
+        });
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [session?.user?.id, todayLoading, state]);
 
   return null;
 }
