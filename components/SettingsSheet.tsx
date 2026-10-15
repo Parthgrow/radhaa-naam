@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Sheet from "./Sheet";
 import { useJaapCount, DEFAULT_SETTINGS } from "@/lib/useJaapCount";
 import type { Theme } from "@/lib/useJaapCount";
+import SubscriptionSection from "./billing/SubscriptionSection";
 
 type Props = { open: boolean; onClose: () => void };
 
@@ -147,6 +148,10 @@ export default function SettingsSheet({ open, onClose }: Props) {
 
         {session?.user?.id && (
           <>
+            <Section title="Subscription">
+              <SubscriptionSection open={open} />
+            </Section>
+
             <Section title="Profile">
               <Field label="Username">
                 <div className="flex gap-2">

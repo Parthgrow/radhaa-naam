@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth-config";
 import { getLifetime, incrementDay } from "@/lib/kv/daily-jaap";
 import { isDateKey } from "@/lib/jaap-validation";
 import type { DayTotals } from "@/lib/kv/types";
+import { paywallResponse } from "@/lib/billing/access";
 
 const MAX_OPS = 31;
 const MAX_DELTA = 1_000_000;
@@ -43,6 +44,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+
+  const blocked = await paywallResponse(userId);
+  if (blocked) return blocked;
 
   let body: unknown;
   try {

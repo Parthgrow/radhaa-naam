@@ -1,63 +1,62 @@
-import { auth } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-import PaymentCard from '@/components/PaymentCard';
-import { PAYMENT_PRODUCTS } from '@/lib/dodo-payments';
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { authOptions } from "@/lib/auth-config";
+import { getAccess } from "@/lib/billing/access";
+import { getPlanPriceInr } from "@/lib/billing/dodo";
+import { daysLeft, formatInr, PLAN } from "@/lib/billing/plan";
+import PlanCard from "@/components/billing/PlanCard";
+import ManageSubscriptionButton from "@/components/billing/ManageSubscriptionButton";
 
 export default async function PaymentsPage() {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/login");
 
-  if (!session) {
-    redirect('/login');
-  }
+  const [access, priceInr] = await Promise.all([getAccess(session.user.id), getPlanPriceInr()]);
+  const sub = access.subscription;
 
   return (
-    <main className="min-h-svh bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Upgrade to Premium
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Unlock premium features and enhance your experience
+    <main className="flex min-h-svh flex-col items-center px-5 py-10">
+      <div className="w-full max-w-sm">
+        <Link href="/" className="text-sm text-muted hover:text-foreground">
+          ← Back
+        </Link>
+        <div className="mb-6 mt-4 text-center">
+          <div className="font-deva text-4xl text-primary">राधे राधे</div>
+          <p className="mt-2 text-sm text-muted">
+            {access.state === "trial" &&
+              `Free trial · ${daysLeft(access.trialEndsAt)} days left. Subscribe any time to keep chanting after it ends.`}
+            {access.state === "free" && `Support Radhe Radhe for ${formatInr(priceInr)} a ${PLAN.interval}.`}
+            {access.state === "expired" && "Subscribe to keep counting your naam jaap."}
+            {access.state === "subscribed" && "Thank you for supporting Radhe Radhe 🙏"}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {Object.values(PAYMENT_PRODUCTS).map((product) => (
-            <PaymentCard
-              key={product.id}
-              productId={product.id}
-            />
-          ))}
-        </div>
-
-        <div className="mt-12 p-6 bg-white rounded-lg border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            What's included?
-          </h2>
-          <ul className="space-y-2 text-gray-700">
-            <li className="flex items-start">
-              <span className="text-blue-600 mr-3">✓</span>
-              <span>Unlimited chanting sessions</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-600 mr-3">✓</span>
-              <span>Advanced statistics and insights</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-600 mr-3">✓</span>
-              <span>Premium meditation sounds</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-600 mr-3">✓</span>
-              <span>Ad-free experience</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-600 mr-3">✓</span>
-              <span>Cloud backup and sync</span>
-            </li>
-          </ul>
-        </div>
+        {access.state === "subscribed" && sub ? (
+          <div className="rounded-3xl bg-surface p-6 shadow-[var(--shadow)] ring-1 ring-ring/40">
+            <div className="text-xs uppercase tracking-[0.25em] text-muted">Your plan</div>
+            <div className="mt-2 text-lg font-semibold text-foreground">
+              {PLAN.name} · {formatInr(priceInr)} / {PLAN.interval}
+            </div>
+            {sub.nextBillingDate && (
+              <p className="mt-1 text-sm text-muted">
+                {sub.cancelAtPeriodEnd || sub.status === "cancelled" ? "Access until " : "Renews on "}
+                {new Date(sub.nextBillingDate).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+            )}
+            {sub.manageable && (
+              <div className="mt-5">
+                <ManageSubscriptionButton />
+              </div>
+            )}
+          </div>
+        ) : (
+          <PlanCard priceInr={priceInr} />
+        )}
       </div>
     </main>
   );
