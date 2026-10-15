@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import { dateRange, getDays } from "@/lib/kv/daily-jaap";
 import { isDateKey } from "@/lib/jaap-validation";
+import { paywallResponse } from "@/lib/billing/access";
 
 const MAX_RANGE_DAYS = 366;
 
@@ -10,6 +11,9 @@ export async function GET(req: Request) {
   if (!session?.user?.id) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const blocked = await paywallResponse(session.user.id);
+  if (blocked) return blocked;
 
   const url = new URL(req.url);
   const startDate = url.searchParams.get("startDate");

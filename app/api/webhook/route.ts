@@ -1,100 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Webhook } from 'svix';
-import { kv } from '@vercel/kv';
+import { Webhook } from "svix";
+import type { Subscription } from "dodopayments/resources/subscriptions";
+import { toSubscriptionRecord } from "@/lib/billing/dodo";
+import { saveSubscription } from "@/lib/kv/subscriptions";
+import { findUserByEmail } from "@/lib/kv/users";
 
-export async function POST(request: NextRequest) {
+type DodoEvent = {
+  type: string;
+  timestamp: string;
+  data: unknown;
+};
+
+/**
+ * Dodo Payments webhooks (Standard Webhooks signatures, verified with svix).
+ *
+ * Every subscription.* event carries the full subscription, so we store its
+ * current status rather than interpreting each event type: active, renewed,
+ * on_hold (renewal failed), cancelled, expired, failed, plan_changed, updated.
+ * Out-of-order and repeated deliveries are handled by saveSubscription, which
+ * ignores anything older than what's stored.
+ */
+export async function POST(request: Request) {
+  const secret = process.env.DODO_PAYMENTS_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error("[Webhook] DODO_PAYMENTS_WEBHOOK_SECRET is not set");
+    return Response.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+
+  const body = await request.text();
+  let event: DodoEvent;
   try {
-    const secret = process.env.DODO_PAYMENTS_WEBHOOK_SECRET || '';
-
-    if (!secret) {
-      console.error('[Webhook] Webhook secret not configured');
-      return NextResponse.json(
-        { error: 'Webhook secret not configured' },
-        { status: 500 }
-      );
-    }
-
-    const body = await request.text();
-    const svix = new Webhook(secret);
-
-    const headers = {
-      'webhook-id': request.headers.get('webhook-id') || '',
-      'webhook-timestamp': request.headers.get('webhook-timestamp') || '',
-      'webhook-signature': request.headers.get('webhook-signature') || '',
-    };
-
-    console.log('[Webhook] Verifying with Svix...');
-
-    let event: any;
-    try {
-      event = svix.verify(body, headers);
-    } catch (err) {
-      console.error('[Webhook] Svix verification failed:', err);
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      );
-    }
-
-    console.log('[Webhook] Event verified:', event.type);
-
-    if (event.type === 'checkout.session.completed') {
-      const { id, metadata, customer, status } = event.data as any;
-
-      if (status === 'success' && metadata?.userId) {
-        await kv.hset(
-          `user:${metadata.userId}:subscription`,
-          {
-            sessionId: id,
-            productId: metadata.productId,
-            email: customer.email,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        );
-
-        console.log(
-          `✓ Payment successful for user ${metadata.userId}, product ${metadata.productId}`
-        );
-      }
-    }
-
-    if (event.type === 'payment.completed' || event.type === 'payment.successful') {
-      const { id, metadata, customer } = event.data as any;
-
-      if (metadata?.userId) {
-        await kv.hset(
-          `user:${metadata.userId}:subscription`,
-          {
-            sessionId: id,
-            productId: metadata.productId,
-            email: customer.email,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        );
-
-        console.log(
-          `✓ Payment completed for user ${metadata.userId}`
-        );
-      }
-    }
-
-    if (event.type === 'subscription.updated' || event.type === 'subscription.created') {
-      const { subscription_id, metadata, status } = event.data as any;
-      if (metadata?.userId && status === 'active') {
-        console.log(`✓ Subscription active for user ${metadata.userId}`);
-      }
-    }
-
-    return NextResponse.json({ received: true });
+    event = new Webhook(secret).verify(body, {
+      "webhook-id": request.headers.get("webhook-id") ?? "",
+      "webhook-timestamp": request.headers.get("webhook-timestamp") ?? "",
+      "webhook-signature": request.headers.get("webhook-signature") ?? "",
+    }) as DodoEvent;
   } catch (error) {
-    console.error('Webhook error:', error);
-    return NextResponse.json(
-      { error: 'Webhook processing failed' },
-      { status: 500 }
+    console.error("[Webhook] Signature verification failed:", error);
+    return Response.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  if (!event.type.startsWith("subscription.")) {
+    // payment.*, refund.*, dispute.*: access follows the subscription status
+    return Response.json({ received: true, ignored: event.type });
+  }
+
+  const sub = event.data as Subscription;
+  try {
+    const userId =
+      sub.metadata?.userId ?? (await findUserByEmail(sub.customer.email.toLowerCase()))?.id ??
+      (await findUserByEmail(sub.customer.email))?.id;
+    if (!userId) {
+      // Nothing to retry: log it so the payment can be matched up by hand
+      console.error(
+        `[Webhook] ${event.type} for ${sub.subscription_id} (${sub.customer.email}) matches no user`
+      );
+      return Response.json({ received: true, unmatched: true });
+    }
+
+    const saved = await saveSubscription(userId, toSubscriptionRecord(sub, event.timestamp));
+    console.log(
+      `[Webhook] ${event.type} user=${userId} sub=${sub.subscription_id} status=${sub.status}` +
+        (saved ? "" : " (older than stored, skipped)")
     );
+    return Response.json({ received: true });
+  } catch (error) {
+    // 500 makes Dodo retry the delivery
+    console.error("[Webhook] Failed to process", event.type, error);
+    return Response.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }

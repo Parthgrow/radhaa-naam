@@ -486,6 +486,12 @@ export function JaapProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ ops: outbox.inflight }),
           keepalive,
         });
+        if (res.status === 402) {
+          // Trial over and not subscribed: keep the changes (in localStorage too)
+          // and send them after the user subscribes and the app reloads
+          canSyncRef.current = false;
+          return;
+        }
         if (res.status === 400) {
           // The server will never accept this batch; retrying would loop forever
           console.error("Sync rejected:", await res.text(), outbox.inflight);

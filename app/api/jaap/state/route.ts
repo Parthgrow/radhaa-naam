@@ -8,6 +8,7 @@ import {
   shiftDate,
 } from "@/lib/kv/daily-jaap";
 import { isDateKey } from "@/lib/jaap-validation";
+import { paywallResponse } from "@/lib/billing/access";
 
 const HISTORY_DAYS = 90;
 
@@ -21,6 +22,9 @@ export async function GET(req: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+
+  const blocked = await paywallResponse(userId);
+  if (blocked) return blocked;
 
   const today = new URL(req.url).searchParams.get("today");
   if (!isDateKey(today)) {
