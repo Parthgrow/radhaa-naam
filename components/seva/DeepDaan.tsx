@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import type { SevaToday } from "@/lib/seva/types";
 import { useJaapCount } from "@/lib/useJaapCount";
+import { useSevaToday } from "@/lib/seva/useSevaToday";
 import { playChime, vibrate } from "@/lib/sounds";
 import GhatScene from "./GhatScene";
 import SakhiBubble from "./SakhiBubble";
@@ -15,29 +16,10 @@ function formatRange(start: string, end: string) {
 }
 
 export default function DeepDaan({ initial }: { initial: SevaToday }) {
-  const { settings, syncNow } = useJaapCount();
-  const [today, setToday] = useState(initial);
+  const { settings } = useJaapCount();
+  const { today, offer, error } = useSevaToday(initial);
   const [freshKey, setFreshKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const sending = useRef(false);
-
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/seva/today", { cache: "no-store" });
-      if (res.status === 402) {
-        window.location.href = "/";
-        return;
-      }
-      if (res.ok) setToday(await res.json());
-    } catch {
-      // keep showing what we have
-    }
-  }, []);
-
-  // Malas chanted moments ago may still be on their way to the server
-  useEffect(() => {
-    syncNow().finally(refresh);
-  }, [syncNow, refresh]);
 
   const seva = today.sevas.find((s) => s.id === "deep_daan");
   const event = today.event;
@@ -47,46 +29,12 @@ export default function DeepDaan({ initial }: { initial: SevaToday }) {
   const capReached = seva.limit >= 11 && seva.used >= 11;
 
   async function lightDiya() {
-    if (!seva || !event || left <= 0 || sending.current) return;
+    if (left <= 0 || sending.current) return;
     sending.current = true;
-    setError(null);
-    // Light it right away; the server confirms (or corrects) a moment later
-    setToday((t) => ({
-      ...t,
-      sevas: t.sevas.map((s) => (s.id === "deep_daan" ? { ...s, used: s.used + 1 } : s)),
-      event: t.event && { ...t.event, myDiyas: t.event.myDiyas + 1, totalDiyas: t.event.totalDiyas + 1 },
-    }));
     setFreshKey((k) => k + 1);
     playChime(settings.sound);
     vibrate(settings.haptics, 15);
-
-    const opId = crypto.randomUUID();
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await fetch("/api/seva/offer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ opId, seva: "deep_daan", count: 1 }),
-        });
-        if (res.status === 402) {
-          window.location.href = "/";
-          return;
-        }
-        const data = await res.json();
-        if (data.today) setToday(data.today);
-        if (!res.ok && data.error === "over_limit") setError("Aaj ke sab deep jal chuke hain.");
-        else if (!res.ok && data.error === "not_now") setError("Deep daan abhi band hai.");
-        else if (!res.ok) throw new Error(data.error);
-        break;
-      } catch {
-        if (attempt === 2) {
-          setError("Deep nahi jal paya. Internet check karke dobara koshish kijiye.");
-          await refresh();
-        } else {
-          await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
-        }
-      }
-    }
+    await offer("deep_daan");
     sending.current = false;
   }
 

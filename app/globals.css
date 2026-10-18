@@ -125,3 +125,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .diya-flame, .diya-new, .water-ripple { animation: none; }
 }
+
+/* Darshan: a petal falling to Radha Rani's feet */
+@keyframes petal-fall {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate(var(--drift, 0px), 62vw) rotate(320deg); opacity: 0.9; }
+}
+.petal-fall { animation: petal-fall 1.6s ease-in forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .petal-fall { animation-duration: 0.01s; }
+}
