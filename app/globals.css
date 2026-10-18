@@ -97,3 +97,31 @@ body {
 /* Hide scrollbars in sheets but keep scroll */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
+
+/* Deep daan: diya flame flicker and the new diya floating onto the water */
+@keyframes diya-flicker {
+  0%, 100% { transform: scale(1, 1); opacity: 1; }
+  30% { transform: scale(0.94, 1.08); opacity: 0.92; }
+  60% { transform: scale(1.04, 0.95); opacity: 1; }
+}
+.diya-flame {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: diya-flicker 1.6s ease-in-out infinite;
+}
+@keyframes diya-float-in {
+  0% { transform: translateY(60px); opacity: 0; }
+  60% { opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.diya-new {
+  animation: diya-float-in 1.4s ease-out both;
+}
+@keyframes water-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(6px); }
+}
+.water-ripple { animation: water-drift 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .diya-flame, .diya-new, .water-ripple { animation: none; }
+}

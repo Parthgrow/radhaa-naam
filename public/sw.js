@@ -1,5 +1,7 @@
 // Radhe Radhe service worker — app-shell cache for offline jaap.
-const CACHE = "radhe-naam-v1";
+// v2: API responses are no longer cached; bumping the name deletes v1 and the
+// stale per-user API data it held.
+const CACHE = "radhe-naam-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg", "/icon-maskable.svg"];
 
 self.addEventListener("install", (event) => {
@@ -24,6 +26,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+
+  // API data is per-user and changes constantly: always go to the network.
+  if (url.pathname.startsWith("/api/")) return;
 
   // Network-first for HTML navigations so updates land fast.
   if (req.mode === "navigate") {
