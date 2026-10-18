@@ -10,6 +10,7 @@ import WeeklySyncTrigger from "@/components/WeeklySyncTrigger";
 import Paywall from "@/components/billing/Paywall";
 import TrialBanner from "@/components/billing/TrialBanner";
 import EventBanner from "@/components/seva/EventBanner";
+import DarshanBanner from "@/components/seva/DarshanBanner";
 
 export default async function Page() {
   const session = await getServerSession(authOptions);
@@ -23,6 +24,7 @@ export default async function Page() {
       <WeeklySyncTrigger />
       <TopBar />
       <TrialBanner access={access} />
+      <DarshanBanner />
       <EventBanner />
       <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
         <ChantArea />

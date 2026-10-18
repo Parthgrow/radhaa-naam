@@ -33,7 +33,9 @@ function opKey(userId: string, opId: string) {
  *    during an event, the event totals
  *
  * KEYS: op, userDay, globalDay, devotees, eventTotal, eventUser
- * ARGV: field, count, limit, userId, opTtl, dayTtl, hasEvent (0|1)
+ * ARGV: field, count, limit, userId, opTtl, dayTtl, hasEvent (0|1),
+ *       detailField, detailValue  (optional extra field on the devotee's day,
+ *       e.g. which bhog level was offered; '' = none)
  * Returns: [status, newUserTotal]  status 1 = applied, 0 = repeat, -1 = over limit
  */
 const OFFER_SCRIPT = `
@@ -55,6 +57,9 @@ redis.call('HINCRBY', KEYS[3], field, count)
 redis.call('EXPIRE', KEYS[3], dayTtl)
 redis.call('PFADD', KEYS[4], ARGV[4])
 redis.call('EXPIRE', KEYS[4], dayTtl)
+if ARGV[8] ~= '' then
+  redis.call('HSET', KEYS[2], ARGV[8], ARGV[9])
+end
 if ARGV[7] == '1' then
   redis.call('HINCRBY', KEYS[5], field, count)
   redis.call('HINCRBY', KEYS[6], field, count)
@@ -72,8 +77,10 @@ export async function recordOffering(args: {
   count: number;
   limit: number;
   eventId: string | null;
+  /** Extra detail stored with the offering, e.g. { field: "bhog_raj_tier", value: 3 } */
+  detail?: { field: string; value: string | number };
 }): Promise<OfferResult> {
-  const { userId, opId, date, field, count, limit, eventId } = args;
+  const { userId, opId, date, field, count, limit, eventId, detail } = args;
   const [status, total] = await kv.eval<(string | number)[], [number, number]>(
     OFFER_SCRIPT,
     [
@@ -84,7 +91,17 @@ export async function recordOffering(args: {
       eventTotalKey(eventId ?? "none"),
       eventUserKey(eventId ?? "none", userId),
     ],
-    [field, count, limit, userId, OP_TTL_SECONDS, DAY_KEY_TTL_SECONDS, eventId ? "1" : "0"]
+    [
+      field,
+      count,
+      limit,
+      userId,
+      OP_TTL_SECONDS,
+      DAY_KEY_TTL_SECONDS,
+      eventId ? "1" : "0",
+      detail?.field ?? "",
+      detail ? String(detail.value) : "",
+    ]
   );
   const s = Number(status);
   return { status: s === 1 ? "applied" : s === 0 ? "repeat" : "over_limit", total: Number(total) };
