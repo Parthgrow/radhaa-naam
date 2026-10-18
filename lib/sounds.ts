@@ -55,3 +55,27 @@ export function vibrate(enabled: boolean, pattern: number | number[]) {
     // ignore
   }
 }
+
+/** A small, bright chime for lighting a diya. */
+export function playChime(enabled: boolean) {
+  if (!enabled) return;
+  const ac = getCtx();
+  if (!ac) return;
+  const now = ac.currentTime;
+  const notes: Array<[number, number]> = [
+    [1318.5, 0], // E6
+    [1760, 0.09], // A6
+  ];
+  for (const [freq, delay] of notes) {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, now + delay);
+    g.gain.setValueAtTime(0, now + delay);
+    g.gain.linearRampToValueAtTime(0.08, now + delay + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + delay + 1.2);
+    osc.connect(g).connect(ac.destination);
+    osc.start(now + delay);
+    osc.stop(now + delay + 1.3);
+  }
+}
