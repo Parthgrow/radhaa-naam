@@ -1,84 +1,100 @@
-import type { DarshanPhase } from "./schedule";
-
 /**
- * Each seva a devotee can offer. `field` is what's counted in Redis.
- *  - once:   at most once per day (aarti, shayan, each bhog)
- *  - earned: as many as the day's completed malas allow (petals, diyas)
+ * Seva is a switch you control, not a schedule. Radha Rani is either asleep or
+ * awake for you; each seva needs one of those states, and wake / sleep flip it.
+ *
+ *   ASLEEP ──wake──▶ AWAKE ──sleep──▶ ASLEEP
+ *                      │
+ *            aarti, bhog (any number of times)
+ *
+ * No clock, no jaap count: you do each one whenever you like.
  */
-export type SevaId =
-  | "aarti_mangala"
-  | "aarti_sandhya"
-  | "phool"
-  | "bhog_bal"
-  | "bhog_raj"
-  | "bhog_sandhya"
-  | "shayan"
-  | "deep_daan";
+export type SevaId = "wake" | "aarti" | "bhog" | "sleep";
+
+export type DarshanState = "asleep" | "awake";
 
 export type SevaDef = {
   id: SevaId;
   name: string;
-  field: string;
-  kind: "once" | "earned";
-  /** Darshan phases when it can be offered; null = any time (event sevas) */
-  phases: DarshanPhase[] | null;
-  /** Exact IST windows [start, end) in minutes; used instead of phases (bhog) */
-  windows?: Array<[number, number]>;
-  /** Only during an event (e.g. Kartik deep daan) */
-  eventOnly?: boolean;
-  /** For earned sevas: most per day, whatever the malas */
-  dailyCap?: number;
-  /** Bhog: the devotee picks a level unlocked by today's malas */
-  bhog?: true;
+  hindi: string;
+  description: string;
+  icon: string;
+  /** The state Radha Rani must be in for this seva */
+  requires: DarshanState;
+  /** The state this seva leaves her in; omitted when it doesn't change it */
+  sets?: DarshanState;
+  /** Shown (greyed out) when she isn't in the required state */
+  reasonUnavailable: string;
 };
 
-const h = (hours: number, minutes = 0) => hours * 60 + minutes;
-
+/** Display order of the seva list. */
 export const SEVAS: Record<SevaId, SevaDef> = {
-  aarti_mangala: { id: "aarti_mangala", name: "Mangala aarti", field: "aarti_mangala", kind: "once", phases: ["mangala"] },
-  aarti_sandhya: { id: "aarti_sandhya", name: "Sandhya aarti", field: "aarti_sandhya", kind: "once", phases: ["sandhya"] },
-  phool: { id: "phool", name: "Phool seva", field: "petals", kind: "earned", phases: ["mangala", "day", "sandhya"], dailyCap: 108 },
-  bhog_bal: { id: "bhog_bal", name: "Bal bhog", field: "bhog_bal", kind: "once", phases: null, windows: [[h(5), h(9)]], bhog: true },
-  bhog_raj: { id: "bhog_raj", name: "Raj bhog", field: "bhog_raj", kind: "once", phases: null, windows: [[h(11), h(13)]], bhog: true },
-  bhog_sandhya: { id: "bhog_sandhya", name: "Sandhya bhog", field: "bhog_sandhya", kind: "once", phases: null, windows: [[h(17), h(20, 30)]], bhog: true },
-  shayan: { id: "shayan", name: "Shayan seva", field: "shayan", kind: "once", phases: ["shayan"] },
-  deep_daan: { id: "deep_daan", name: "Deep daan", field: "diyas", kind: "earned", phases: null, eventOnly: true, dailyCap: 11 },
+  wake: {
+    id: "wake",
+    name: "Radha Rani ko jagaiye",
+    hindi: "जागरण",
+    description: "Pat kholiye, deep jalaiye",
+    icon: "🌅",
+    requires: "asleep",
+    sets: "awake",
+    reasonUnavailable: "Radha Rani pehle se jaagi hain",
+  },
+  aarti: {
+    id: "aarti",
+    name: "Aarti karein",
+    hindi: "आरती",
+    description: "Saat baar thali ghumaiye",
+    icon: "🪔",
+    requires: "awake",
+    reasonUnavailable: "Pehle Radha Rani ko jagaiye",
+  },
+  bhog: {
+    id: "bhog",
+    name: "Bhog lagaiye",
+    hindi: "भोग",
+    description: "Makhan-mishri, laddoo, bhog thali",
+    icon: "🍯",
+    requires: "awake",
+    reasonUnavailable: "Pehle Radha Rani ko jagaiye",
+  },
+  sleep: {
+    id: "sleep",
+    name: "Shayan karaiye",
+    hindi: "शयन",
+    description: "Lori sunaiye, pat band kijiye",
+    icon: "🌙",
+    requires: "awake",
+    sets: "asleep",
+    reasonUnavailable: "Radha Rani vishram kar rahi hain",
+  },
 };
 
-export const BHOG_SEVAS: SevaId[] = ["bhog_bal", "bhog_raj", "bhog_sandhya"];
+export const SEVA_ORDER: SevaId[] = ["wake", "aarti", "bhog", "sleep"];
 
 export function isSevaId(value: unknown): value is SevaId {
   return typeof value === "string" && value in SEVAS;
 }
 
-/**
- * How many of an earned seva the devotee has today: one per completed mala
- * (so the first mala lights the first diya), up to the daily cap.
- */
-export function earnedToday(seva: SevaDef, malasToday: number): number {
-  if (seva.kind === "once") return 1;
-  return Math.min(Math.max(0, Math.floor(malasToday)), seva.dailyCap ?? Infinity);
+export function isAwake(state: DarshanState): boolean {
+  return state === "awake";
 }
 
-/** Bhog levels: 1 makhan-mishri, 2 laddoo & fruits, 3 full thali. */
-export type BhogTier = 1 | 2 | 3;
+/** Can this seva be offered right now, given whether she's awake? */
+export function availability(seva: SevaDef, awake: boolean): { available: boolean; reason: string | null } {
+  const ok = (seva.requires === "awake") === awake;
+  return { available: ok, reason: ok ? null : seva.reasonUnavailable };
+}
 
-export const BHOG_ITEMS: Record<BhogTier, { name: string; hindi: string }> = {
-  1: { name: "Makhan-mishri", hindi: "माखन-मिश्री" },
-  2: { name: "Laddoo & fruits", hindi: "लड्डू और फल" },
-  3: { name: "Full thali", hindi: "भोग थाली" },
+/** The three bhog offerings; every one is free to choose, as often as you like. */
+export type BhogItem = "makhan_mishri" | "laddoo_phal" | "thali";
+
+export const BHOG_ITEMS: Record<BhogItem, { name: string; hindi: string }> = {
+  makhan_mishri: { name: "Makhan-mishri", hindi: "माखन-मिश्री" },
+  laddoo_phal: { name: "Laddoo & fruits", hindi: "लड्डू और फल" },
+  thali: { name: "Full thali", hindi: "भोग थाली" },
 };
 
-/** Malas needed today for each bhog level. The full thali needs the devotee's own daily goal. */
-export function bhogThresholds(malaGoal: number): Record<BhogTier, number> {
-  return { 1: 1, 2: 3, 3: Math.max(3, Math.floor(malaGoal) || 5) };
-}
+export const BHOG_ORDER: BhogItem[] = ["makhan_mishri", "laddoo_phal", "thali"];
 
-/** Highest bhog level unlocked by today's malas (0 = none yet). */
-export function bhogUnlocked(malasToday: number, malaGoal: number): 0 | BhogTier {
-  const t = bhogThresholds(malaGoal);
-  if (malasToday >= t[3]) return 3;
-  if (malasToday >= t[2]) return 2;
-  if (malasToday >= t[1]) return 1;
-  return 0;
+export function isBhogItem(value: unknown): value is BhogItem {
+  return typeof value === "string" && value in BHOG_ITEMS;
 }

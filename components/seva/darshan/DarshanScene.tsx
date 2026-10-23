@@ -1,14 +1,14 @@
 "use client";
 
 import { memo } from "react";
-import type { DarshanPhase } from "@/lib/seva/schedule";
+import type { LightPhase } from "@/lib/seva/schedule";
 import { POSHAK_COLORS } from "@/lib/seva/schedule";
-import type { BhogTier } from "@/lib/seva/sevas";
+import type { BhogItem } from "@/lib/seva/sevas";
 
 /**
  * Placeholder darshan of Shri Radha Rani, drawn in SVG until the commissioned
  * artwork arrives. Each function below is one layer from the artist brief
- * (background, simhasan, Radha Rani, poshak, jewellery, garland, petals,
+ * (background, simhasan, Radha Rani, poshak, jewellery,
  * bhog, lamps, curtain). All share one 720 × 1080 canvas, the brief's
  * 2160 × 3240 at a third, so a layer can later be swapped for the artist's
  * PNG (<image href=… width={W} height={H} />) without touching the others.
@@ -24,15 +24,14 @@ const SKIN = "#f3d3b0";
 
 type Palette = { inner: [string, string]; wall: string; tint: string | null; lampsLit: boolean };
 
-const PHASE_PALETTE: Record<DarshanPhase, Palette> = {
-  mangala: { inner: ["#fde3e8", "#f7c39f"], wall: "#e3a7b8", tint: "rgba(120,80,160,0.10)", lampsLit: true },
+const PHASE_PALETTE: Record<LightPhase, Palette> = {
+  dawn: { inner: ["#fde3e8", "#f7c39f"], wall: "#e3a7b8", tint: "rgba(120,80,160,0.10)", lampsLit: true },
   day: { inner: ["#fff7ec", "#ffe6cf"], wall: "#f0c6d3", tint: null, lampsLit: false },
-  sandhya: { inner: ["#ffd6ad", "#f2a07a"], wall: "#cf7f98", tint: "rgba(255,140,60,0.08)", lampsLit: true },
-  shayan: { inner: ["#463566", "#2a1d48"], wall: "#2a1d45", tint: "rgba(20,10,50,0.30)", lampsLit: true },
-  closed: { inner: ["#3a2b58", "#22173c"], wall: "#22173c", tint: "rgba(10,5,30,0.40)", lampsLit: true },
+  evening: { inner: ["#ffd6ad", "#f2a07a"], wall: "#cf7f98", tint: "rgba(255,140,60,0.08)", lampsLit: true },
+  night: { inner: ["#463566", "#2a1d48"], wall: "#2a1d45", tint: "rgba(20,10,50,0.30)", lampsLit: true },
 };
 
-function Background({ phase }: { phase: DarshanPhase }) {
+function Background({ phase }: { phase: LightPhase }) {
   const p = PHASE_PALETTE[phase];
   return (
     <g>
@@ -189,69 +188,15 @@ function Jewellery() {
   );
 }
 
-const FLOWER_COLORS = ["#f8f8f0", "#ffb3c6", "#ffa726"];
-
-/** Garland that grows through the day as the devotee offers petals: 0 none … 3 full. */
-function Garland({ level }: { level: 0 | 1 | 2 | 3 }) {
-  if (level === 0) return null;
-  // Each loop is a quadratic curve from shoulder to shoulder, hanging lower each level
-  const loops = [
-    { dip: 700, n: 13 },
-    { dip: 830, n: 17 },
-    { dip: 960, n: 21 },
-  ].slice(0, level);
-  return (
-    <g>
-      {loops.map(({ dip, n }, li) => (
-        <g key={li}>
-          {Array.from({ length: n }, (_, i) => {
-            const t = i / (n - 1);
-            const x = (1 - t) * (1 - t) * 300 + 2 * (1 - t) * t * 360 + t * t * 420;
-            const y = (1 - t) * (1 - t) * 430 + 2 * (1 - t) * t * dip + t * t * 430;
-            return <circle key={i} cx={x} cy={y} r={li === 0 ? 8 : 7} fill={FLOWER_COLORS[(i + li) % 3]} stroke="#e8a1b6" strokeWidth={1} />;
-          })}
-        </g>
-      ))}
-    </g>
-  );
-}
-
-/** Petals offered today, gathered at Radha Rani's feet. */
-function PetalsAtFeet({ count }: { count: number }) {
-  const shown = Math.min(count, 60);
-  return (
-    <g>
-      {Array.from({ length: shown }, (_, i) => {
-        const a = (i * 137.5 * Math.PI) / 180;
-        const r = 18 + (i % 10) * 9;
-        const x = 360 + Math.cos(a) * r * 1.9;
-        const y = 846 + Math.sin(a) * r * 0.32;
-        return (
-          <ellipse
-            key={i}
-            cx={x}
-            cy={y}
-            rx={7}
-            ry={4}
-            transform={`rotate(${(i * 47) % 180} ${x} ${y})`}
-            fill={FLOWER_COLORS[i % 3] === "#f8f8f0" ? "#e91e63" : FLOWER_COLORS[i % 3]}
-            opacity={0.9}
-          />
-        );
-      })}
-    </g>
-  );
-}
-
 /** Bhog on a low chowki before the simhasan. */
-function Bhog({ tier }: { tier: BhogTier | null }) {
-  if (!tier) return null;
+function Bhog({ item }: { item: BhogItem | null }) {
+  if (!item) return null;
   return (
     <g transform="translate(360 930)">
       <rect x={-140} y={0} width={280} height={24} rx={6} fill="#8d5524" />
       <rect x={-124} y={24} width={16} height={34} fill="#6d3f17" />
       <rect x={108} y={24} width={16} height={34} fill="#6d3f17" />
-      {tier === 1 && (
+      {item === "makhan_mishri" && (
         <g>
           <ellipse cx={0} cy={-6} rx={46} ry={14} fill="#c0c0c0" />
           <path d="M-40 -8 Q0 -60 40 -8 Z" fill="#fffdf3" />
@@ -260,7 +205,7 @@ function Bhog({ tier }: { tier: BhogTier | null }) {
           ))}
         </g>
       )}
-      {tier === 2 && (
+      {item === "laddoo_phal" && (
         <g>
           <ellipse cx={-50} cy={-4} rx={52} ry={12} fill={GOLD} />
           {[[-74, -14], [-50, -14], [-26, -14], [-62, -32], [-38, -32], [-50, -50]].map(([x, y], i) => (
@@ -272,7 +217,7 @@ function Bhog({ tier }: { tier: BhogTier | null }) {
           <circle cx={72} cy={-14} r={11} fill="#ff9800" />
         </g>
       )}
-      {tier === 3 && (
+      {item === "thali" && (
         <g>
           <ellipse cx={0} cy={-6} rx={120} ry={26} fill={GOLD} />
           <ellipse cx={0} cy={-10} rx={108} ry={20} fill={GOLD_LIGHT} />
@@ -383,17 +328,13 @@ function AartiThali({ angle }: { angle: number }) {
 function DarshanScene({
   phase,
   weekday,
-  garland,
-  petals,
   bhog,
   curtainOpen,
   aartiAngle,
 }: {
-  phase: DarshanPhase;
+  phase: LightPhase;
   weekday: number;
-  garland: 0 | 1 | 2 | 3;
-  petals: number;
-  bhog: BhogTier | null;
+  bhog: BhogItem | null;
   curtainOpen: number;
   aartiAngle: number | null;
 }) {
@@ -405,10 +346,8 @@ function DarshanScene({
       <Simhasan />
       <RadhaRani weekday={weekday} />
       <Jewellery />
-      <Garland level={garland} />
-      <PetalsAtFeet count={petals} />
       <Lamps lit={palette.lampsLit} />
-      <Bhog tier={bhog} />
+      <Bhog item={bhog} />
       {palette.tint && <rect width={W} height={H} fill={palette.tint} pointerEvents="none" />}
       {aartiAngle !== null && <AartiThali angle={aartiAngle} />}
       <Curtain open={curtainOpen} />

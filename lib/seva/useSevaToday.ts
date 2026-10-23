@@ -1,40 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useJaapCount } from "@/lib/useJaapCount";
-import { SEVAS, type BhogTier, type SevaId } from "./sevas";
+import { SEVAS, type BhogItem, type SevaId } from "./sevas";
 import type { SevaToday } from "./types";
 
 const ERRORS: Record<string, string> = {
-  over_limit: "Aaj ke liye yeh seva poori ho gayi.",
-  not_now: "Is seva ka samay abhi nahi hai.",
-  locked: "Yeh bhog abhi khula nahi hai. Thoda aur jaap kijiye.",
+  wrong_state: "Radha Rani ki sthiti badal chuki hai. Dekhiye aur dobara koshish kijiye.",
 };
 
-/** Count an offering on screen straight away; the server's answer replaces it. */
-function optimistic(t: SevaToday, seva: SevaId, count: number, tier?: BhogTier): SevaToday {
+/** Show the result on screen straight away; the server's answer replaces it. */
+function optimistic(t: SevaToday, seva: SevaId, item?: BhogItem): SevaToday {
   const def = SEVAS[seva];
-  const reg = { ...t.register };
-  if (seva === "aarti_mangala" || seva === "aarti_sandhya") reg.aarti += 1;
-  if (seva === "phool") reg.petals += count;
-  if (def.bhog) reg.bhog += 1;
-  if (seva === "deep_daan") reg.diyas += count;
+  const register = { ...t.register, [seva]: t.register[seva] + 1 };
+  const awake = def.sets ? def.sets === "awake" : t.awake;
   return {
     ...t,
-    register: reg,
-    sevas: t.sevas.map((s) =>
-      s.id === seva ? { ...s, used: s.used + count, available: s.used + count < s.limit, ...(tier ? { tier } : {}) } : s
-    ),
-    event:
-      seva === "deep_daan" && t.event
-        ? { ...t.event, myDiyas: t.event.myDiyas + count, totalDiyas: t.event.totalDiyas + count }
-        : t.event,
+    awake,
+    register,
+    // Waking or sleeping clears the bhog; offering one sets it
+    bhog: def.sets ? null : item ?? t.bhog,
   };
 }
 
-/** Today's seva state, kept fresh, plus `offer()` with optimistic update and retries. */
+/** Radha Rani's state, kept fresh, plus `offer()` with optimistic update and retries. */
 export function useSevaToday(initial: SevaToday) {
-  const { syncNow } = useJaapCount();
   const [today, setToday] = useState(initial);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,9 +41,7 @@ export function useSevaToday(initial: SevaToday) {
   }, []);
 
   useEffect(() => {
-    // Malas chanted moments ago may still be on their way to the server
-    syncNow().finally(refresh);
-    // Windows open and close through the day
+    // Another device may have changed her state; the light also shifts through the day
     const id = window.setInterval(refresh, 60_000);
     const onVisible = () => document.visibilityState === "visible" && refresh();
     document.addEventListener("visibilitychange", onVisible);
@@ -62,19 +49,19 @@ export function useSevaToday(initial: SevaToday) {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [syncNow, refresh]);
+  }, [refresh]);
 
   const offer = useCallback(
-    async (seva: SevaId, { count = 1, tier }: { count?: number; tier?: BhogTier } = {}): Promise<boolean> => {
+    async (seva: SevaId, item?: BhogItem): Promise<boolean> => {
       setError(null);
-      setToday((t) => optimistic(t, seva, count, tier));
+      setToday((t) => optimistic(t, seva, item));
       const opId = crypto.randomUUID();
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const res = await fetch("/api/seva/offer", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ opId, seva, count, ...(tier ? { tier } : {}) }),
+            body: JSON.stringify({ opId, seva, ...(item ? { item } : {}) }),
           });
           if (res.status === 402) {
             window.location.href = "/";
