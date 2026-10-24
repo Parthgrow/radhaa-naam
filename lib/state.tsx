@@ -409,8 +409,6 @@ type JaapContextValue = {
   resetBead: () => void;
   nextMala: () => void;
   resetToday: () => void;
-  /** Send unsaved changes now (e.g. before a page reads today's malas from the server). */
-  syncNow: () => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => void;
 };
 
@@ -530,8 +528,6 @@ export function JaapProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     flushRef.current = flush;
   }, [flush]);
-
-  const syncNow = useCallback(() => flush(), [flush]);
 
   /** Run a user action and queue what it changed for saving. */
   const record = useCallback(
@@ -708,9 +704,8 @@ export function JaapProvider({ children }: { children: ReactNode }) {
       nextMala,
       resetToday,
       updateSettings,
-      syncNow,
     }),
-    [state, loading, count, addJaaps, undo, resetBead, nextMala, resetToday, updateSettings, syncNow]
+    [state, loading, count, addJaaps, undo, resetBead, nextMala, resetToday, updateSettings]
   );
 
   return <JaapContext.Provider value={value}>{children}</JaapContext.Provider>;
