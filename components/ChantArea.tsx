@@ -68,6 +68,11 @@ export default function ChantArea() {
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
         return;
       }
+      // Space / Enter on any other button, link or dialog is meant for that control,
+      // not a bead (the chant button itself still counts)
+      if (target && !target.closest("[data-chant-area]") && target.closest('button, a, select, [role="dialog"]')) {
+        return;
+      }
       if (e.key === " " || e.key === "Enter" || e.key === "ArrowUp") {
         e.preventDefault();
         handleCount();
@@ -85,6 +90,7 @@ export default function ChantArea() {
     <button
       type="button"
       aria-label="Tap to chant"
+      data-chant-area
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}

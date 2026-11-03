@@ -5,6 +5,7 @@ import { getAccess } from "@/lib/billing/access";
 import { getSevaToday } from "@/lib/seva/today";
 import Paywall from "@/components/billing/Paywall";
 import Darshan from "@/components/seva/darshan/Darshan";
+import TalkToRadhaRani from "@/components/messages/TalkToRadhaRani";
 
 export const metadata = { title: "Shri Radha Rani Darshan — Radhe Radhe" };
 
@@ -15,5 +16,10 @@ export default async function DarshanPage() {
   const access = await getAccess(session.user.id);
   if (!access.hasAccess) return <Paywall access={access} />;
 
-  return <Darshan initial={await getSevaToday(session.user.id)} />;
+  return (
+    <>
+      <Darshan initial={await getSevaToday(session.user.id)} />
+      <TalkToRadhaRani />
+    </>
+  );
 }

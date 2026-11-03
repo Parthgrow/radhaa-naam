@@ -11,6 +11,7 @@ import WeeklySyncTrigger from "@/components/WeeklySyncTrigger";
 import Paywall from "@/components/billing/Paywall";
 import TrialBanner from "@/components/billing/TrialBanner";
 import DarshanBanner from "@/components/seva/DarshanBanner";
+import TalkToRadhaRani from "@/components/messages/TalkToRadhaRani";
 
 export default async function Page() {
   const session = await getServerSession(authOptions);
@@ -23,7 +24,7 @@ export default async function Page() {
   const awake = await isRadhaRaniAwake(session.user.id).catch(() => null);
 
   return (
-    <main className="flex min-h-svh flex-col">
+    <main className="flex min-h-svh flex-col pb-24">
       <WeeklySyncTrigger />
       <TopBar />
       <TrialBanner access={access} />
@@ -33,6 +34,7 @@ export default async function Page() {
       </div>
       <StatsBar />
       <SevenDayStrip />
+      <TalkToRadhaRani />
     </main>
   );
 }
