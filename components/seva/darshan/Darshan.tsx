@@ -114,7 +114,7 @@ export default function Darshan({ initial }: { initial: SevaToday }) {
         )}
       </div>
 
-      <div className="mx-auto w-full max-w-md space-y-3 px-5 py-4">
+      <div className="mx-auto w-full max-w-md space-y-3 px-5 pb-24 pt-4">
         <SakhiBubble>{sakhi}</SakhiBubble>
         {error && <p className="text-center text-sm text-red-600">{error}</p>}
 
